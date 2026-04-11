@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">MC Poser social preview</title>
+  <desc id="desc">A preview card for MC Poser showing the app name, feature summary, and stylized interface blocks.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1c1f25" />
+      <stop offset="100%" stop-color="#262c35" />
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2f3642" />
+      <stop offset="100%" stop-color="#21262f" />
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)" />
+
+  <g opacity="0.14" stroke="#ffffff">
+    <path d="M0 90H1200" />
+    <path d="M0 180H1200" />
+    <path d="M0 270H1200" />
+    <path d="M0 360H1200" />
+    <path d="M0 450H1200" />
+    <path d="M0 540H1200" />
+    <path d="M120 0V630" />
+    <path d="M240 0V630" />
+    <path d="M360 0V630" />
+    <path d="M480 0V630" />
+    <path d="M600 0V630" />
+    <path d="M720 0V630" />
+    <path d="M840 0V630" />
+    <path d="M960 0V630" />
+    <path d="M1080 0V630" />
+  </g>
+
+  <rect x="54" y="54" width="1092" height="522" rx="34" fill="#101318" fill-opacity="0.22" />
+  <rect x="72" y="72" width="1056" height="486" rx="28" fill="url(#panel)" stroke="#4b5667" stroke-opacity="0.4" />
+
+  <rect x="98" y="98" width="170" height="34" rx="17" fill="#db7731" fill-opacity="0.2" />
+  <text x="122" y="120" fill="#ffb66d" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="3">MC POSER</text>
+
+  <text x="98" y="212" fill="#f5f7fa" font-family="Segoe UI, Arial, sans-serif" font-size="64" font-weight="800">Pose Minecraft skins in 3D</text>
+  <text x="98" y="282" fill="#bec7d4" font-family="Segoe UI, Arial, sans-serif" font-size="28">Load skins, build poses, export renders, and share scenes online.</text>
+
+  <g fill="#d7dde7" font-family="Segoe UI, Arial, sans-serif" font-size="24">
+    <circle cx="110" cy="350" r="7" fill="#ffac55" />
+    <text x="132" y="358">Username lookup and PNG upload</text>
+    <circle cx="110" cy="396" r="7" fill="#ffac55" />
+    <text x="132" y="404">Per-joint posing controls and presets</text>
+    <circle cx="110" cy="442" r="7" fill="#ffac55" />
+    <text x="132" y="450">Export settings and compact share links</text>
+  </g>
+
+  <g transform="translate(760 120)">
+    <rect width="270" height="340" rx="24" fill="#1c2128" stroke="#4b5667" stroke-opacity="0.45" />
+    <rect x="18" y="18" width="234" height="42" rx="14" fill="#252b35" />
+    <rect x="18" y="82" width="72" height="238" rx="18" fill="#20252d" />
+    <rect x="108" y="82" width="144" height="176" rx="18" fill="#2a313c" />
+    <rect x="108" y="276" width="144" height="44" rx="14" fill="#db7731" fill-opacity="0.9" />
+    <rect x="132" y="112" width="96" height="96" rx="18" fill="#384456" />
+    <rect x="163" y="102" width="34" height="18" rx="9" fill="#ffac55" />
+    <rect x="146" y="138" width="68" height="16" rx="8" fill="#ffddb4" fill-opacity="0.9" />
+    <rect x="158" y="162" width="44" height="60" rx="12" fill="#9ac0ff" fill-opacity="0.85" />
+  </g>
+</svg>

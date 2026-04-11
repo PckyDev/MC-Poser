@@ -128,6 +128,10 @@ const PNG_DATA_URL_PREFIX = "data:image/png;base64,";
 const SHARE_FILE_TYPES: readonly ExportFileType[] = ["png", "jpg", "webp"];
 const SHARE_MODEL_PREFERENCES: readonly ModelPreference[] = ["default", "slim", "auto-detect"];
 const SHARE_ARM_MODELS: readonly ArmModel[] = ["default", "slim"];
+const PRIMARY_SITE_ORIGIN = "https://mcposer.pcky.dev";
+const DEFAULT_SEO_TITLE = "MC Poser | Pose Minecraft skins in 3D";
+const DEFAULT_SEO_DESCRIPTION =
+  "Browser-based Minecraft skin pose editor with 3D controls, image export, and compact share links.";
 
 type SharedSelectionPayload = readonly [0 | 1, number];
 
@@ -1577,8 +1581,9 @@ async function decompressTextPayload(payload: string): Promise<string> {
 
 function buildShareUrl(kind: ShareHashPayload["kind"], payload: string): string {
   const shareHashKey = kind === "image" ? SHARE_IMAGE_HASH_KEY : SHARE_PROJECT_HASH_KEY;
+  const shareBaseUrl = buildCanonicalUrl(window.location.pathname, window.location.search);
 
-  return `${window.location.origin}${window.location.pathname}#${shareHashKey}=${payload}`;
+  return `${shareBaseUrl}#${shareHashKey}=${payload}`;
 }
 
 function readSharePayloadFromHash(hash: string): ShareHashPayload | null {
@@ -1627,6 +1632,63 @@ async function copyTextToClipboard(value: string): Promise<void> {
   if (!didCopy) {
     throw new Error("Unable to copy that link in this browser.");
   }
+}
+
+function upsertMetaTag(
+  attributeName: "name" | "property",
+  attributeValue: string,
+  content: string,
+): void {
+  const selector = `meta[${attributeName}="${attributeValue}"]`;
+  let metaTag = document.head.querySelector<HTMLMetaElement>(selector);
+
+  if (!metaTag) {
+    metaTag = document.createElement("meta");
+    metaTag.setAttribute(attributeName, attributeValue);
+    document.head.append(metaTag);
+  }
+
+  metaTag.content = content;
+}
+
+function upsertCanonicalLink(href: string): void {
+  let canonicalLink = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+
+  if (!canonicalLink) {
+    canonicalLink = document.createElement("link");
+    canonicalLink.rel = "canonical";
+    document.head.append(canonicalLink);
+  }
+
+  canonicalLink.href = href;
+}
+
+function buildCanonicalUrl(pathname: string, search = ""): string {
+  return new URL(`${pathname}${search}`, `${PRIMARY_SITE_ORIGIN}/`).toString();
+}
+
+function setDocumentSeoMetadata({
+  description,
+  title,
+}: {
+  description: string;
+  title: string;
+}): void {
+  if (typeof document === "undefined" || typeof window === "undefined") {
+    return;
+  }
+
+  const canonicalUrl = buildCanonicalUrl(window.location.pathname, window.location.search);
+
+  document.title = title;
+  upsertMetaTag("name", "description", description);
+  upsertMetaTag("property", "og:title", title);
+  upsertMetaTag("property", "og:description", description);
+  upsertMetaTag("property", "og:type", "website");
+  upsertMetaTag("property", "og:url", canonicalUrl);
+  upsertMetaTag("name", "twitter:title", title);
+  upsertMetaTag("name", "twitter:description", description);
+  upsertCanonicalLink(canonicalUrl);
 }
 
 function getBoundsCorners(bounds: Box3): Vector3[] {
@@ -1792,6 +1854,54 @@ export default function App() {
   useEffect(() => {
     viewportLightingModeRef.current = viewportLightingMode;
   }, [viewportLightingMode]);
+
+  useEffect(() => {
+    const activeSkinLabel = skin?.label?.trim() ?? "";
+
+    if (shareLandingMode === "image") {
+      const sharedDimensions = sharedImageSettings
+        ? `${sharedImageSettings.width}x${sharedImageSettings.height}`
+        : null;
+      const sharedTitle = activeSkinLabel
+        ? `${activeSkinLabel} shared render | MC Poser`
+        : "Shared Minecraft skin render | MC Poser";
+      const sharedSubject = activeSkinLabel
+        ? `${activeSkinLabel} Minecraft skin render`
+        : "Minecraft skin render";
+
+      setDocumentSeoMetadata({
+        title: sharedTitle,
+        description: sharedDimensions
+          ? `View a shared ${sharedDimensions} ${sharedSubject} created with MC Poser.`
+          : `View a shared ${sharedSubject} created with MC Poser.`,
+      });
+      return;
+    }
+
+    if (activeSkinLabel) {
+      setDocumentSeoMetadata({
+        title: `${activeSkinLabel} pose editor | MC Poser`,
+        description:
+          `Pose the ${activeSkinLabel} Minecraft skin in 3D, adjust layers and framing, ` +
+          "export polished renders, and share the scene with MC Poser.",
+      });
+      return;
+    }
+
+    if (hasEnteredWorkspace) {
+      setDocumentSeoMetadata({
+        title: `${poseFileName.replace(/\.mcpose$/i, "")} | MC Poser`,
+        description:
+          "Create Minecraft skin poses in 3D, export image renders, and share scenes online with MC Poser.",
+      });
+      return;
+    }
+
+    setDocumentSeoMetadata({
+      title: DEFAULT_SEO_TITLE,
+      description: DEFAULT_SEO_DESCRIPTION,
+    });
+  }, [hasEnteredWorkspace, poseFileName, shareLandingMode, sharedImageSettings, skin]);
 
   useEffect(() => {
     if (!isExportModalOpen) {

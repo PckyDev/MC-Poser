@@ -1,0 +1,17 @@
+{
+  "name": "MC Poser",
+  "short_name": "MC Poser",
+  "description": "Browser-based Minecraft skin pose editor with 3D controls, exports, and share links.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1c1f25",
+  "theme_color": "#262c35",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

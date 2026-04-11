@@ -3,15 +3,182 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="application-name" content="MC Poser" />
     <meta
       name="description"
-      content="Load a Minecraft skin, pose a 3D avatar, and export a clean PNG render."
+      content="MC Poser is a browser-based Minecraft skin pose editor for loading skins, building 3D poses, exporting renders, and sharing scenes online."
     />
-    <meta name="theme-color" content="#10251e" />
-    <title>MC Poser</title>
+    <meta
+      name="robots"
+      content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
+    />
+    <meta name="theme-color" content="#262c35" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:site_name" content="MC Poser" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://mcposer.pcky.dev/" />
+    <meta property="og:title" content="MC Poser | Pose Minecraft skins in 3D" />
+    <meta
+      property="og:description"
+      content="Load a Minecraft skin, pose it in 3D, export polished renders, and share scenes with compact links."
+    />
+    <meta property="og:image" content="https://mcposer.pcky.dev/og-preview.svg" />
+    <meta property="og:image:secure_url" content="https://mcposer.pcky.dev/og-preview.svg" />
+    <meta property="og:image:type" content="image/svg+xml" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="MC Poser preview card" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="MC Poser | Pose Minecraft skins in 3D" />
+    <meta
+      name="twitter:description"
+      content="Load a Minecraft skin, pose it in 3D, export polished renders, and share scenes with compact links."
+    />
+    <meta name="twitter:image" content="https://mcposer.pcky.dev/og-preview.svg" />
+    <link rel="canonical" href="https://mcposer.pcky.dev/" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <title>MC Poser | Pose Minecraft skins in 3D</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "MC Poser",
+        "url": "https://mcposer.pcky.dev/",
+        "applicationCategory": "GraphicsApplication",
+        "operatingSystem": "Web",
+        "browserRequirements": "Requires JavaScript and a modern desktop or mobile browser.",
+        "description": "Browser-based Minecraft skin pose editor with 3D controls, image export, and compact share links.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "featureList": [
+          "Minecraft username skin lookup",
+          "PNG skin upload",
+          "3D pose editing",
+          "Image export controls",
+          "Shareable project and image links"
+        ]
+      }
+    </script>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Arial, sans-serif;
+        background: #1c1f25;
+        color: #d6dbe4;
+      }
+
+      .seo-shell {
+        max-width: 74rem;
+        margin: 0 auto;
+        padding: 2.5rem 1.5rem 4rem;
+      }
+
+      .seo-kicker {
+        margin: 0 0 0.85rem;
+        color: #ffac55;
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .seo-shell h1 {
+        margin: 0;
+        max-width: 14ch;
+        font-size: clamp(2.4rem, 5vw, 4.5rem);
+        line-height: 0.96;
+        letter-spacing: -0.04em;
+      }
+
+      .seo-shell p {
+        max-width: 48rem;
+        color: #b7c0cd;
+        font-size: 1rem;
+        line-height: 1.7;
+      }
+
+      .seo-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+        gap: 1rem;
+        margin-top: 2rem;
+      }
+
+      .seo-card {
+        padding: 1rem 1.1rem;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .seo-card h2 {
+        margin: 0 0 0.65rem;
+        font-size: 1rem;
+      }
+
+      .seo-card ul,
+      .seo-card ol {
+        margin: 0;
+        padding-left: 1.2rem;
+        color: #b7c0cd;
+        line-height: 1.7;
+      }
+
+      .no-js {
+        padding: 0.95rem 1.5rem 1.25rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        background: #20242b;
+        color: #b7c0cd;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main class="seo-shell">
+        <p class="seo-kicker">Minecraft Skin Pose Editor</p>
+        <h1>Pose Minecraft skins in 3D, then export or share the result.</h1>
+        <p>
+          MC Poser is a browser-based tool for loading Minecraft skins from a username or PNG,
+          adjusting character poses with per-joint controls, exporting polished renders, and
+          sharing projects with compact links.
+        </p>
+
+        <div class="seo-grid">
+          <section class="seo-card">
+            <h2>Key features</h2>
+            <ul>
+              <li>Username-based Minecraft skin lookup</li>
+              <li>PNG upload with slim, classic, or auto-detect arms</li>
+              <li>Interactive 3D posing with camera and lighting controls</li>
+              <li>Image export settings for size, format, and background</li>
+              <li>Share links for projects and rendered images</li>
+            </ul>
+          </section>
+
+          <section class="seo-card">
+            <h2>How it works</h2>
+            <ol>
+              <li>Load a Minecraft skin from a username or local PNG file.</li>
+              <li>Pose the model in the 3D editor and fine-tune the framing.</li>
+              <li>Export an image or share the scene with a generated link.</li>
+            </ol>
+          </section>
+        </div>
+      </main>
+    </div>
+    <noscript>
+      <div class="no-js">
+        MC Poser needs JavaScript for the interactive editor, but the project overview above is
+        still available for preview and search indexing.
+      </div>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
