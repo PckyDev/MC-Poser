@@ -1,5 +1,6 @@
 export type ModelPreference = "default" | "slim" | "auto-detect";
 export type ArmModel = "default" | "slim";
+export type AvatarType = "default" | "bobblehead";
 
 export type PoseState = {
   headPitch: number;

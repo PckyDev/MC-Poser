@@ -54,6 +54,7 @@ import {
 } from "./config/pose";
 import type {
   ArmModel,
+  AvatarType,
   LoadedSkin,
   ModelPreference,
   PoseBoneId,
@@ -62,11 +63,13 @@ import type {
   SkinLookupResult,
 } from "./types/editor";
 import {
+  applyAvatarType,
   applyPose,
   buildDownloadName,
   buildSuggestedPoseName,
   clonePose,
   countAdjustedJoints,
+  formatAvatarTypeLabel,
   formatModelLabel,
   formatPresetName,
   normalizePoseFileName,
@@ -82,6 +85,7 @@ type WorkspaceDocument = {
   showOuterLayer: boolean;
   showOuterLayerIn3d: boolean;
   skin: LoadedSkin | null;
+  avatarType: AvatarType;
   resolvedModel: ArmModel | null;
   uploadModel: ModelPreference;
 };
@@ -95,6 +99,7 @@ type ImportedWorkspaceFile = {
   selectedPreset?: unknown;
   showOuterLayer?: unknown;
   showOuterLayerIn3d?: unknown;
+  avatarType?: unknown;
   resolvedModel?: unknown;
   uploadModel?: unknown;
 };
@@ -109,6 +114,7 @@ type SerializableWorkspaceFile = {
   showOuterLayer: boolean;
   showOuterLayerIn3d: boolean;
   resolvedModel: ArmModel | null;
+  avatarType: AvatarType;
   uploadModel: ModelPreference;
 };
 
@@ -128,6 +134,7 @@ const PNG_DATA_URL_PREFIX = "data:image/png;base64,";
 const SHARE_FILE_TYPES: readonly ExportFileType[] = ["png", "jpg", "webp"];
 const SHARE_MODEL_PREFERENCES: readonly ModelPreference[] = ["default", "slim", "auto-detect"];
 const SHARE_ARM_MODELS: readonly ArmModel[] = ["default", "slim"];
+const SHARE_AVATAR_TYPES: readonly AvatarType[] = ["default", "bobblehead"];
 const PRIMARY_SITE_ORIGIN = "https://mcposer.pcky.dev";
 const DEFAULT_SEO_TITLE = "MC Poser | Pose Minecraft skins in 3D";
 const DEFAULT_SEO_DESCRIPTION =
@@ -154,6 +161,7 @@ type SharedProjectPayload = readonly [
   SharedSkinPayload | null,
   -1 | 0 | 1,
   0 | 1 | 2,
+  0 | 1,
 ];
 
 type SharedExportSettingsPayload = readonly [
@@ -822,6 +830,10 @@ function isModelPreference(value: unknown): value is ModelPreference {
   return value === "default" || value === "slim" || value === "auto-detect";
 }
 
+function isAvatarType(value: unknown): value is AvatarType {
+  return value === "default" || value === "bobblehead";
+}
+
 function isArmModel(value: unknown): value is ArmModel {
   return value === "default" || value === "slim";
 }
@@ -1280,6 +1292,16 @@ function exportFileTypeFromShareCode(value: unknown): ExportFileType {
     : "png";
 }
 
+function avatarTypeToShareCode(value: AvatarType): 0 | 1 {
+  return value === "bobblehead" ? 1 : 0;
+}
+
+function avatarTypeFromShareCode(value: unknown): AvatarType {
+  return typeof value === "number" && SHARE_AVATAR_TYPES[value]
+    ? SHARE_AVATAR_TYPES[value]
+    : "default";
+}
+
 function encodeShareSelection(selection: PoseSelection): SharedSelectionPayload {
   if (selection.kind === "bone") {
     const boneIndex = POSE_BONES.findIndex((bone) => bone.id === selection.id);
@@ -1389,6 +1411,7 @@ function encodeWorkspaceForShare(
     encodeShareSkin(workspaceFile.skin),
     armModelToShareCode(workspaceFile.resolvedModel),
     modelPreferenceToShareCode(workspaceFile.uploadModel),
+    avatarTypeToShareCode(workspaceFile.avatarType),
   ];
 }
 
@@ -1428,6 +1451,7 @@ function decodeSharedProjectPayload(payload: unknown): ImportedWorkspaceFile {
     showOuterLayerIn3d: sharePayload[6] === 1,
     resolvedModel,
     uploadModel: modelPreferenceFromShareCode(sharePayload[9]),
+    avatarType: avatarTypeFromShareCode(sharePayload[10]),
   };
 }
 
@@ -1765,6 +1789,7 @@ function createWorkspaceDocument(
     showOuterLayer: overrides.showOuterLayer ?? true,
     showOuterLayerIn3d: overrides.showOuterLayerIn3d ?? false,
     skin: overrides.skin ?? null,
+    avatarType: overrides.avatarType ?? "default",
     resolvedModel: overrides.resolvedModel ?? null,
     uploadModel: overrides.uploadModel ?? "auto-detect",
   };
@@ -1801,6 +1826,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [startupFileName, setStartupFileName] = useState("untitled-pose-01.mcpose");
   const [startupUsername, setStartupUsername] = useState(DEFAULT_USERNAME);
+  const [startupAvatarType, setStartupAvatarType] = useState<AvatarType>("default");
   const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -1839,6 +1865,7 @@ export default function App() {
     showOuterLayer,
     showOuterLayerIn3d,
     skin,
+    avatarType,
     resolvedModel,
     uploadModel,
   } = activeDocument;
@@ -1951,7 +1978,7 @@ export default function App() {
     return () => {
       isCancelled = true;
     };
-  }, [exportSettings, isExportModalOpen, skin, viewerReady]);
+  }, [avatarType, exportSettings, isExportModalOpen, skin, viewerReady]);
 
   function releaseDocumentUploadSkin(document: WorkspaceDocument): void {
     const currentSkin = document.skin;
@@ -2334,6 +2361,7 @@ export default function App() {
       showOuterLayer: documentToSerialize.showOuterLayer,
       showOuterLayerIn3d: documentToSerialize.showOuterLayerIn3d,
       resolvedModel: documentToSerialize.resolvedModel,
+      avatarType: documentToSerialize.avatarType,
       uploadModel: documentToSerialize.uploadModel,
     };
   }
@@ -2689,6 +2717,7 @@ export default function App() {
     clearPendingNewFileUpload();
     setStartupFileName(buildSuggestedPoseName(nextPoseIndexRef.current));
     setStartupUsername(username || DEFAULT_USERNAME);
+    setStartupAvatarType("default");
     setIsNewFileModalOpen(true);
   }
 
@@ -3007,9 +3036,10 @@ export default function App() {
         }
 
         viewer.playerObject.skin.setInnerLayerVisible(true);
+        applyAvatarType(viewer, avatarType);
         rebuildOuterLayerVoxelMeshes(viewer);
         applyOuterLayerPresentation(viewer, showOuterLayer, showOuterLayerIn3d);
-  applyViewportLighting(viewer, viewportLightingModeRef.current);
+        applyViewportLighting(viewer, viewportLightingModeRef.current);
         centerViewerOnCharacter(viewer);
         applyPose(viewer, pose);
         syncSelectedOutline();
@@ -3045,7 +3075,20 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [activeDocumentId, skin?.source, skin?.modelPreference, showOuterLayer, showOuterLayerIn3d]);
+  }, [activeDocumentId, avatarType, skin?.source, skin?.modelPreference, showOuterLayer, showOuterLayerIn3d]);
+
+  useEffect(() => {
+    const viewer = viewerRef.current;
+
+    if (!viewer || !skin) {
+      return;
+    }
+
+    applyAvatarType(viewer, avatarType);
+    syncSelectedOutline();
+    viewer.render();
+    publishDebugState(viewer);
+  }, [avatarType, skin]);
 
   async function loadUsername(nextUsername: string, targetDocumentId = activeDocumentId): Promise<void> {
     const trimmedUsername = nextUsername.trim();
@@ -3210,6 +3253,7 @@ export default function App() {
         detail,
         modelPreference: "auto-detect",
       },
+      avatarType: startupAvatarType,
       resolvedModel: null,
       uploadModel: "auto-detect",
     });
@@ -3260,6 +3304,9 @@ export default function App() {
           typeof parsedFile.showOuterLayerIn3d === "boolean"
             ? parsedFile.showOuterLayerIn3d
             : false,
+        avatarType: isAvatarType(parsedFile.avatarType)
+          ? parsedFile.avatarType
+          : "default",
         resolvedModel,
         uploadModel: isModelPreference(parsedFile.uploadModel)
           ? parsedFile.uploadModel
@@ -3418,7 +3465,7 @@ export default function App() {
         return () => {
           isCancelled = true;
         };
-      }, [isLoading, shareLandingMode, sharedImageSettings, skin, viewerReady]);
+      }, [avatarType, isLoading, shareLandingMode, sharedImageSettings, skin, viewerReady]);
   function handleSelectBone(nextBoneId: PoseBoneId): void {
     updateDocument(activeDocumentId, (currentDocument) => ({
       ...currentDocument,
@@ -3812,6 +3859,15 @@ export default function App() {
     }
   }
 
+  function handleAvatarTypeChange(nextAvatarType: AvatarType): void {
+    updateDocument(activeDocumentId, (currentDocument) => ({
+      ...currentDocument,
+      avatarType: nextAvatarType,
+    }));
+    setError(null);
+    setStatus(`Switched ${poseFileName} to the ${formatAvatarTypeLabel(nextAvatarType)} avatar type.`);
+  }
+
   function handleStartupFileNameBlur(): void {
     setStartupFileName(normalizePoseFileName(startupFileName));
   }
@@ -3825,7 +3881,9 @@ export default function App() {
       return;
     }
 
-    const nextDocument = openDocumentFromStartup(startupFileName);
+    const nextDocument = openDocumentFromStartup(startupFileName, {
+      avatarType: startupAvatarType,
+    });
 
     finalizeWorkspaceEntry();
     clearPendingNewFileUpload();
@@ -3960,6 +4018,7 @@ export default function App() {
         isRigModified={adjustedJointCount > 0}
         assetDetail={skin?.detail ?? null}
         activePoseLabel={activePoseLabel}
+        avatarType={avatarType}
         modelLabel={currentModelLabel}
         selectedPreset={selectedPreset}
         username={username}
@@ -3972,6 +4031,7 @@ export default function App() {
         onUsernameSubmit={handleUsernameSubmit}
         onQuickLoad={handleQuickLoad}
         onOpenFilePicker={handleOpenFilePicker}
+        onAvatarTypeChange={handleAvatarTypeChange}
         onUploadModelChange={handleUploadModelChange}
       />
 
@@ -4027,6 +4087,7 @@ export default function App() {
         isOpen={isNewFileModalOpen}
         startupFileName={startupFileName}
         startupUsername={startupUsername}
+        startupAvatarType={startupAvatarType}
         isLoading={isLoading}
         uploadedSkinPreviewUrl={pendingNewFileUpload?.previewUrl ?? null}
         uploadedSkinName={pendingNewFileUpload?.fileName ?? null}
@@ -4034,6 +4095,7 @@ export default function App() {
         onStartupFileNameChange={setStartupFileName}
         onStartupFileNameBlur={handleStartupFileNameBlur}
         onStartupUsernameChange={setStartupUsername}
+        onStartupAvatarTypeChange={setStartupAvatarType}
         onClose={closeNewFileModal}
         onCreateUsername={() => createUsernamePoseFile()}
         onCreateUpload={createUploadedPoseFile}

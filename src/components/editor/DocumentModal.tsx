@@ -1,15 +1,33 @@
 import { useEffect, useId, useState, type FormEvent } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCube, faFileLines, faImage, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faCube, faFileLines, faImage, faUser, faXmark } from "@fortawesome/free-solid-svg-icons";
 
 import { QUICK_LOADS } from "../../config/pose";
-import type { ModelPreference } from "../../types/editor";
-import { formatPresetName } from "../../utils/editor";
+import type { AvatarType, ModelPreference } from "../../types/editor";
+import { formatAvatarTypeLabel, formatPresetName } from "../../utils/editor";
 
 const DOCUMENT_MODAL_PAGES = [
   { id: "pose-file", label: "Pose File", icon: faFileLines },
   { id: "current-asset", label: "Current Asset", icon: faCube },
+  { id: "avatar-type", label: "Avatar Type", icon: faUser },
   { id: "skin-source", label: "Skin Source", icon: faImage },
+];
+
+const AVATAR_TYPE_OPTIONS: Array<{
+  description: string;
+  label: string;
+  value: AvatarType;
+}> = [
+  {
+    description: "Standard Minecraft proportions.",
+    label: "Default",
+    value: "default",
+  },
+  {
+    description: "Large head with a smaller body and limbs.",
+    label: "Bobblehead",
+    value: "bobblehead",
+  },
 ];
 
 type DocumentModalPage = (typeof DOCUMENT_MODAL_PAGES)[number]["id"];
@@ -22,6 +40,7 @@ type DocumentModalProps = {
   isRigModified: boolean;
   assetDetail: string | null;
   activePoseLabel: string;
+  avatarType: AvatarType;
   modelLabel: string;
   selectedPreset: string | null;
   username: string;
@@ -34,6 +53,7 @@ type DocumentModalProps = {
   onUsernameSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onQuickLoad: (value: string) => void;
   onOpenFilePicker: () => void;
+  onAvatarTypeChange: (value: AvatarType) => void;
   onUploadModelChange: (value: ModelPreference) => void;
 };
 
@@ -45,6 +65,7 @@ export function DocumentModal({
   isRigModified,
   assetDetail,
   activePoseLabel,
+  avatarType,
   modelLabel,
   selectedPreset,
   username,
@@ -57,6 +78,7 @@ export function DocumentModal({
   onUsernameSubmit,
   onQuickLoad,
   onOpenFilePicker,
+  onAvatarTypeChange,
   onUploadModelChange,
 }: DocumentModalProps) {
   const [activePage, setActivePage] = useState<DocumentModalPage>("pose-file");
@@ -74,6 +96,7 @@ export function DocumentModal({
 
   const isPoseFilePage = activePage === "pose-file";
   const isCurrentAssetPage = activePage === "current-asset";
+  const isAvatarTypePage = activePage === "avatar-type";
 
   return (
     <div className="document-overlay">
@@ -175,6 +198,10 @@ export function DocumentModal({
                     <strong>{modelLabel}</strong>
                   </div>
                   <div className="info-card">
+                    <span>Avatar type</span>
+                    <strong>{formatAvatarTypeLabel(avatarType)}</strong>
+                  </div>
+                  <div className="info-card">
                     <span>Selection</span>
                     <strong>{selectedPreset ? formatPresetName(selectedPreset) : "Custom"}</strong>
                   </div>
@@ -183,6 +210,34 @@ export function DocumentModal({
                 <p className="panel-note">
                   {assetDetail ?? "Open the startup modal or load a skin from the document modal."}
                 </p>
+              </section>
+            ) : isAvatarTypePage ? (
+              <section className="modal-page-section">
+                <div className="modal-section-header">
+                  <h3>Avatar type</h3>
+                  <p className="modal-section-copy">
+                    Swap between standard Minecraft proportions and a bobblehead-style body at any time.
+                  </p>
+                </div>
+
+                <div className="avatar-type-grid" role="list" aria-label="Avatar type options">
+                  {AVATAR_TYPE_OPTIONS.map((avatarOption) => (
+                    <button
+                      key={avatarOption.value}
+                      className={
+                        avatarType === avatarOption.value
+                          ? "avatar-type-option is-active"
+                          : "avatar-type-option"
+                      }
+                      type="button"
+                      aria-pressed={avatarType === avatarOption.value}
+                      onClick={() => onAvatarTypeChange(avatarOption.value)}
+                    >
+                      <strong>{avatarOption.label}</strong>
+                      <span>{avatarOption.description}</span>
+                    </button>
+                  ))}
+                </div>
               </section>
             ) : (
               <section className="modal-page-section">
@@ -249,11 +304,13 @@ export function DocumentModal({
               ? "Changes to the pose file name apply directly in the current editor session."
               : isCurrentAssetPage
                 ? "The current asset page reflects the live scene in the editor viewport."
+                : isAvatarTypePage
+                  ? "Avatar type changes update the current workspace proportions immediately."
               : "Use quick loads, a username lookup, or a PNG upload to swap the active skin source."}
           </p>
 
           <div className="modal-footer-actions">
-            {!isPoseFilePage ? (
+            {!isPoseFilePage && !isAvatarTypePage ? (
               <>
                 <button className="toolbar-button" type="button" onClick={onOpenFilePicker}>
                   Upload PNG

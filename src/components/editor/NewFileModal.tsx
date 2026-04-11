@@ -3,13 +3,32 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark } from "@fortawesome/free-solid-svg-icons";
 
 import { QUICK_LOADS } from "../../config/pose";
+import type { AvatarType } from "../../types/editor";
 
 type SkinSourceTab = "name" | "upload";
+
+const AVATAR_TYPE_OPTIONS: Array<{
+  description: string;
+  label: string;
+  value: AvatarType;
+}> = [
+  {
+    description: "Standard Minecraft proportions.",
+    label: "Default",
+    value: "default",
+  },
+  {
+    description: "Big head with a compact body and limbs.",
+    label: "Bobblehead",
+    value: "bobblehead",
+  },
+];
 
 type NewFileModalProps = {
   isOpen: boolean;
   startupFileName: string;
   startupUsername: string;
+  startupAvatarType: AvatarType;
   isLoading: boolean;
   uploadedSkinPreviewUrl: string | null;
   uploadedSkinName: string | null;
@@ -17,6 +36,7 @@ type NewFileModalProps = {
   onStartupFileNameChange: (value: string) => void;
   onStartupFileNameBlur: () => void;
   onStartupUsernameChange: (value: string) => void;
+  onStartupAvatarTypeChange: (value: AvatarType) => void;
   onClose: () => void;
   onCreateUsername: () => void;
   onCreateUpload: () => void;
@@ -28,6 +48,7 @@ export function NewFileModal({
   isOpen,
   startupFileName,
   startupUsername,
+  startupAvatarType,
   isLoading,
   uploadedSkinPreviewUrl,
   uploadedSkinName,
@@ -35,6 +56,7 @@ export function NewFileModal({
   onStartupFileNameChange,
   onStartupFileNameBlur,
   onStartupUsernameChange,
+  onStartupAvatarTypeChange,
   onClose,
   onCreateUsername,
   onCreateUpload,
@@ -107,102 +129,132 @@ export function NewFileModal({
             />
           </section>
 
-          <section className="startup-section modal-page-section">
-            <div className="modal-section-header">
-              <h3>Skin source</h3>
-              <p className="modal-section-copy">
-                New files must start from a username skin lookup or an uploaded PNG.
-              </p>
-            </div>
+          <div className="startup-config-grid">
+            <section className="startup-section modal-page-section">
+              <div className="modal-section-header">
+                <h3>Skin source</h3>
+                <p className="modal-section-copy">
+                  New files must start from a username skin lookup or an uploaded PNG.
+                </p>
+              </div>
 
-            <div className="new-file-source-tabs" role="tablist" aria-label="Skin source options">
-              <button
-                className={
-                  isNameTab ? "new-file-source-tab is-active" : "new-file-source-tab"
-                }
-                type="button"
-                role="tab"
-                aria-selected={isNameTab}
-                onClick={() => setActiveSkinSourceTab("name")}
-              >
-                By Name
-              </button>
-              <button
-                className={
-                  !isNameTab ? "new-file-source-tab is-active" : "new-file-source-tab"
-                }
-                type="button"
-                role="tab"
-                aria-selected={!isNameTab}
-                onClick={() => setActiveSkinSourceTab("upload")}
-              >
-                Upload PNG
-              </button>
-            </div>
+              <div className="new-file-source-tabs" role="tablist" aria-label="Skin source options">
+                <button
+                  className={
+                    isNameTab ? "new-file-source-tab is-active" : "new-file-source-tab"
+                  }
+                  type="button"
+                  role="tab"
+                  aria-selected={isNameTab}
+                  onClick={() => setActiveSkinSourceTab("name")}
+                >
+                  By Name
+                </button>
+                <button
+                  className={
+                    !isNameTab ? "new-file-source-tab is-active" : "new-file-source-tab"
+                  }
+                  type="button"
+                  role="tab"
+                  aria-selected={!isNameTab}
+                  onClick={() => setActiveSkinSourceTab("upload")}
+                >
+                  Upload PNG
+                </button>
+              </div>
 
-            {isNameTab ? (
-              <div className="new-file-tab-panel">
-                <label className="form-label" htmlFor="startup-username">
-                  Username lookup
-                </label>
-                <input
-                  id="startup-username"
-                  className="editor-input"
-                  value={startupUsername}
-                  onChange={(event) => onStartupUsernameChange(event.target.value)}
-                  placeholder="Notch"
-                />
+              {isNameTab ? (
+                <div className="new-file-tab-panel">
+                  <label className="form-label" htmlFor="startup-username">
+                    Username lookup
+                  </label>
+                  <input
+                    id="startup-username"
+                    className="editor-input"
+                    value={startupUsername}
+                    onChange={(event) => onStartupUsernameChange(event.target.value)}
+                    placeholder="Notch"
+                  />
 
-                <div className="chip-strip chip-strip--startup">
-                  {QUICK_LOADS.map((quickUsername) => (
+                  <div className="chip-strip chip-strip--startup">
+                    {QUICK_LOADS.map((quickUsername) => (
+                      <button
+                        key={quickUsername}
+                        className="chip-button"
+                        type="button"
+                        onClick={() => onQuickLoad(quickUsername)}
+                        disabled={isLoading}
+                      >
+                        {quickUsername}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="new-file-tab-panel">
+                  <div className="new-file-upload-actions">
                     <button
-                      key={quickUsername}
-                      className="chip-button"
+                      className="toolbar-button"
                       type="button"
-                      onClick={() => onQuickLoad(quickUsername)}
+                      onClick={onOpenSkinUpload}
                       disabled={isLoading}
                     >
-                      {quickUsername}
+                      Choose PNG
                     </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="new-file-tab-panel">
-                <div className="new-file-upload-actions">
-                  <button
-                    className="toolbar-button"
-                    type="button"
-                    onClick={onOpenSkinUpload}
-                    disabled={isLoading}
-                  >
-                    Choose PNG
-                  </button>
-                </div>
-
-                {uploadedSkinPreviewUrl ? (
-                  <div className="new-file-upload-preview">
-                    <div className="new-file-upload-preview-frame">
-                      <img
-                        className="new-file-upload-preview-image"
-                        src={uploadedSkinPreviewUrl}
-                        alt={uploadedSkinName ?? "Uploaded Minecraft skin preview"}
-                      />
-                    </div>
-
-                    <div className="new-file-upload-preview-meta">
-                      <strong>{uploadedSkinName}</strong>
-                      <span>{uploadedSkinDetail}</span>
-                    </div>
                   </div>
-                ) : (
-                  <p className="panel-note">
-                    No PNG selected yet. Choose a skin file to preview it here before creating the workspace.
-                  </p>
-                )}
+
+                  {uploadedSkinPreviewUrl ? (
+                    <div className="new-file-upload-preview">
+                      <div className="new-file-upload-preview-frame">
+                        <img
+                          className="new-file-upload-preview-image"
+                          src={uploadedSkinPreviewUrl}
+                          alt={uploadedSkinName ?? "Uploaded Minecraft skin preview"}
+                        />
+                      </div>
+
+                      <div className="new-file-upload-preview-meta">
+                        <strong>{uploadedSkinName}</strong>
+                        <span>{uploadedSkinDetail}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="panel-note">
+                      No PNG selected yet. Choose a skin file to preview it here before creating the workspace.
+                    </p>
+                  )}
+                </div>
+              )}
+            </section>
+
+            <section className="startup-section modal-page-section">
+              <div className="modal-section-header">
+                <h3>Avatar type</h3>
+                <p className="modal-section-copy">
+                  Choose the body proportions used for this workspace.
+                </p>
               </div>
-            )}
-          </section>
+
+              <div className="avatar-type-grid" role="list" aria-label="Avatar type options">
+                {AVATAR_TYPE_OPTIONS.map((avatarOption) => (
+                  <button
+                    key={avatarOption.value}
+                    className={
+                      startupAvatarType === avatarOption.value
+                        ? "avatar-type-option is-active"
+                        : "avatar-type-option"
+                    }
+                    type="button"
+                    aria-pressed={startupAvatarType === avatarOption.value}
+                    onClick={() => onStartupAvatarTypeChange(avatarOption.value)}
+                  >
+                    <strong>{avatarOption.label}</strong>
+                    <span>{avatarOption.description}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          </div>
         </div>
 
         <div className="startup-footer modal-footer">

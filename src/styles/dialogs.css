@@ -330,6 +330,49 @@
   gap: 0.85rem;
 }
 
+.startup-config-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.18fr) minmax(16rem, 0.82fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.avatar-type-grid {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.avatar-type-option {
+  width: 100%;
+  display: grid;
+  gap: 0.22rem;
+  padding: 0.78rem 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-main);
+  text-align: left;
+}
+
+.avatar-type-option:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.avatar-type-option.is-active {
+  border-color: rgba(240, 142, 58, 0.42);
+  background: rgba(240, 142, 58, 0.16);
+}
+
+.avatar-type-option strong {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.avatar-type-option span {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
 .new-file-upload-actions {
   display: flex;
   gap: 0.65rem;

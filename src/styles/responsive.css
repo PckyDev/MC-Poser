@@ -64,6 +64,7 @@
     bottom: -7.35rem;
   }
 
+  .startup-config-grid,
   .new-file-upload-preview {
     grid-template-columns: 1fr;
   }
