@@ -1,0 +1,144 @@
+.viewport-column {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  background: var(--bg-main);
+  overflow: hidden;
+}
+
+.viewport-frame {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  background: var(--bg-main);
+  overflow: hidden;
+}
+
+.viewport-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background:
+    radial-gradient(circle at top, rgba(255, 172, 85, 0.12), transparent 24%),
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(180deg, #363d48 0%, #242a31 100%);
+  background-size: auto, 38px 38px, 38px 38px, auto;
+  box-shadow: none;
+}
+
+.viewer-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.viewport-toolbar,
+.viewport-overlay,
+.viewport-loader,
+.viewport-gizmo {
+  position: absolute;
+  z-index: 1;
+}
+
+.viewport-toolbar,
+.viewport-overlay,
+.viewport-loader {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(17, 21, 26, 0.72);
+  backdrop-filter: blur(8px);
+  color: #dfe5ed;
+}
+
+.viewport-toolbar,
+.viewport-loader,
+.viewport-overlay--top-right {
+  padding: 0.45rem 0.7rem;
+}
+
+.viewport-overlay,
+.viewport-loader {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+}
+
+.viewport-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.viewport-overlay--top-left {
+  top: 1rem;
+  left: 1rem;
+}
+
+.viewport-toolbar--top-left {
+  top: 1rem;
+  left: 1rem;
+}
+
+.viewport-overlay--top-right {
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  align-items: center;
+}
+
+.viewport-icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+}
+
+.viewport-icon-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.viewport-icon-button.is-active {
+  background: rgba(240, 142, 58, 0.2);
+  color: #ffe8cf;
+}
+
+.viewport-gizmo {
+  right: 1rem;
+  bottom: 1rem;
+  width: 5.85rem;
+  height: 5.85rem;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  backdrop-filter: none;
+  box-shadow: none;
+  pointer-events: auto;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.viewport-gizmo-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+}
+
+.viewport-loader {
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+}

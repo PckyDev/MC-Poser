@@ -1,0 +1,103 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap");
+
+:root {
+  font-family: "IBM Plex Sans", sans-serif;
+  color: #d6dbe4;
+  background: #1c1f25;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color-scheme: dark;
+  --bg-main: #1c1f25;
+  --bg-panel: #252a31;
+  --bg-panel-soft: #2b313a;
+  --bg-panel-raised: #303744;
+  --bg-toolbar: #20242b;
+  --bg-viewport: #2a3038;
+  --border-subtle: #3b4553;
+  --border-strong: #4c5a6e;
+  --text-main: #d6dbe4;
+  --text-dim: #9aa5b5;
+  --text-faint: #707a87;
+  --accent: #f08e3a;
+  --accent-strong: #ffac55;
+  --accent-muted: rgba(240, 142, 58, 0.14);
+  --danger: #d8725c;
+  --success: #63be8a;
+  --shadow-panel: inset 0 1px 0 rgba(255, 255, 255, 0.025), 0 14px 40px rgba(0, 0, 0, 0.28);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  min-height: 100%;
+}
+
+body {
+  min-width: 320px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top, rgba(255, 172, 85, 0.06), transparent 22%),
+    linear-gradient(180deg, #1f232a 0%, #181b20 100%);
+  color: var(--text-main);
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+  border-radius: 0;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+button,
+input,
+select {
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+input:focus-visible,
+select:focus-visible,
+button:focus-visible {
+  outline: none;
+}
+
+input:focus-visible,
+select:focus-visible {
+  border-color: rgba(255, 172, 85, 0.85);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 172, 85, 0.72),
+    inset 0 0 18px rgba(255, 172, 85, 0.1);
+}
+
+button:focus-visible {
+  border-color: rgba(255, 172, 85, 0.85);
+  box-shadow: inset 0 0 0 1px rgba(255, 172, 85, 0.72);
+}
+
+.hidden-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}

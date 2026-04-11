@@ -1,0 +1,85 @@
+import type { SkinViewer } from "skinview3d";
+
+import type { ArmModel, ModelPreference, PoseState } from "../types/editor";
+
+export function clonePose(pose: PoseState): PoseState {
+  return { ...pose };
+}
+
+function toRadians(value: number): number {
+  return (value * Math.PI) / 180;
+}
+
+export function applyPose(viewer: SkinViewer, pose: PoseState): void {
+  const skin = viewer.playerObject.skin;
+
+  skin.head.rotation.set(toRadians(pose.headPitch), toRadians(pose.headYaw), 0);
+  skin.body.rotation.set(0, toRadians(pose.bodyYaw), 0);
+  skin.leftArm.rotation.set(
+    toRadians(pose.leftArmPitch),
+    toRadians(pose.leftArmYaw),
+    toRadians(pose.leftArmRoll),
+  );
+  skin.rightArm.rotation.set(
+    toRadians(pose.rightArmPitch),
+    toRadians(pose.rightArmYaw),
+    toRadians(pose.rightArmRoll),
+  );
+  skin.leftLeg.rotation.set(
+    toRadians(pose.leftLegPitch),
+    toRadians(pose.leftLegYaw),
+    toRadians(pose.leftLegRoll),
+  );
+  skin.rightLeg.rotation.set(
+    toRadians(pose.rightLegPitch),
+    toRadians(pose.rightLegYaw),
+    toRadians(pose.rightLegRoll),
+  );
+}
+
+export function formatPresetName(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+export function formatModelLabel(
+  modelPreference: ModelPreference,
+  resolvedModel: ArmModel | null,
+): string {
+  if (modelPreference === "auto-detect") {
+    return resolvedModel === null
+      ? "Auto-detect arms"
+      : `${resolvedModel === "slim" ? "Slim" : "Classic"} arms (auto)`;
+  }
+
+  return `${modelPreference === "slim" ? "Slim" : "Classic"} arms`;
+}
+
+export function buildDownloadName(label: string): string {
+  const base = label
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return `${base || "mc-poser"}-pose`;
+}
+
+export function normalizePoseFileName(value: string): string {
+  const cleaned = value
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^A-Za-z0-9._-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  const base = cleaned || "untitled-pose";
+
+  return base.endsWith(".mcpose") ? base : `${base}.mcpose`;
+}
+
+export function buildSuggestedPoseName(index: number): string {
+  return `untitled-pose-${String(index).padStart(2, "0")}.mcpose`;
+}
+
+export function countAdjustedJoints(pose: PoseState): number {
+  return Object.values(pose).filter((value) => value !== 0).length;
+}

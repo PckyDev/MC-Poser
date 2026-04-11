@@ -1,0 +1,42 @@
+{
+  "name": "mc-poser",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pose Minecraft skins in 3D and export polished renders.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "check": "tsc -b"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PckyDev/MC-Poser.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/PckyDev/MC-Poser/issues"
+  },
+  "homepage": "https://github.com/PckyDev/MC-Poser#readme",
+  "dependencies": {
+    "@fortawesome/free-solid-svg-icons": "^7.2.0",
+    "@fortawesome/react-fontawesome": "^3.3.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "skinview3d": "^3.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.8"
+  }
+}

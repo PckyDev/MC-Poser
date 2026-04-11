@@ -1,0 +1,100 @@
+@media (max-width: 1380px) {
+  .editor-body {
+    grid-template-columns: 280px minmax(0, 1fr) 330px;
+  }
+}
+
+@media (max-width: 1120px) {
+  .editor-topbar {
+    grid-template-columns: 1fr;
+  }
+
+  .startup-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .startup-hero-media {
+    min-height: 13rem;
+  }
+
+  .startup-hero-image {
+    width: min(21rem, 62vw);
+    right: 0;
+    bottom: -10rem;
+  }
+
+  .toolbar-strip {
+    justify-content: start;
+  }
+
+  .editor-body {
+    grid-template-columns: 240px minmax(0, 1fr) 280px;
+  }
+}
+
+@media (max-width: 760px) {
+  .editor-body {
+    grid-template-columns: 200px minmax(0, 1fr) 240px;
+  }
+
+  .info-grid,
+  .inline-form-row,
+  .startup-footer,
+  .document-footer {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .modal-body,
+  .startup-choice-grid,
+  .document-header,
+  .startup-header,
+  .modal-header {
+    grid-template-columns: 1fr;
+  }
+
+  .startup-hero-media {
+    min-height: 10rem;
+  }
+
+  .startup-hero-image {
+    width: 14.4rem;
+    right: 0.2rem;
+    bottom: -7.35rem;
+  }
+
+  .new-file-upload-preview {
+    grid-template-columns: 1fr;
+  }
+
+  .export-modal-body,
+  .share-modal-body,
+  .export-settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-sidebar {
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .modal-sidebar-nav,
+  .document-header-actions {
+    justify-content: start;
+  }
+
+  .modal-footer-actions {
+    justify-content: start;
+  }
+
+  .viewport-stage {
+    min-height: 0;
+  }
+
+  .viewport-overlay--top-right {
+    right: auto;
+    left: 1rem;
+    top: 3.6rem;
+  }
+}
