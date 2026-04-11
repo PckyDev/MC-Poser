@@ -17,6 +17,7 @@ import {
   MeshStandardMaterial,
   NearestFilter,
   PerspectiveCamera,
+  Quaternion,
   Raycaster,
   Scene,
   SRGBColorSpace,
@@ -47,6 +48,7 @@ import {
   DEFAULT_POSE_SELECTION,
   DEFAULT_USERNAME,
   NEUTRAL_POSE,
+  getPoseBones,
   POSE_BONES,
   PRESET_NAMES,
   POSE_PRESETS,
@@ -74,6 +76,11 @@ import {
   formatPresetName,
   normalizePoseFileName,
 } from "./utils/editor";
+import {
+  getAdvancedAvatarOutlineObjects,
+  isAdvancedAvatarActive,
+  setAdvancedAvatarOuterLayerVisibility,
+} from "./utils/avatarRig";
 
 type WorkspaceDocument = {
   id: string;
@@ -134,7 +141,7 @@ const PNG_DATA_URL_PREFIX = "data:image/png;base64,";
 const SHARE_FILE_TYPES: readonly ExportFileType[] = ["png", "jpg", "webp"];
 const SHARE_MODEL_PREFERENCES: readonly ModelPreference[] = ["default", "slim", "auto-detect"];
 const SHARE_ARM_MODELS: readonly ArmModel[] = ["default", "slim"];
-const SHARE_AVATAR_TYPES: readonly AvatarType[] = ["default", "bobblehead"];
+const SHARE_AVATAR_TYPES: readonly AvatarType[] = ["default", "bobblehead", "advanced"];
 const PRIMARY_SITE_ORIGIN = "https://mcposer.pcky.dev";
 const DEFAULT_SEO_TITLE = "MC Poser | Pose Minecraft skins in 3D";
 const DEFAULT_SEO_DESCRIPTION =
@@ -161,7 +168,7 @@ type SharedProjectPayload = readonly [
   SharedSkinPayload | null,
   -1 | 0 | 1,
   0 | 1 | 2,
-  0 | 1,
+  0 | 1 | 2,
 ];
 
 type SharedExportSettingsPayload = readonly [
@@ -831,7 +838,7 @@ function isModelPreference(value: unknown): value is ModelPreference {
 }
 
 function isAvatarType(value: unknown): value is AvatarType {
-  return value === "default" || value === "bobblehead";
+  return value === "default" || value === "bobblehead" || value === "advanced";
 }
 
 function isArmModel(value: unknown): value is ArmModel {
@@ -1292,8 +1299,16 @@ function exportFileTypeFromShareCode(value: unknown): ExportFileType {
     : "png";
 }
 
-function avatarTypeToShareCode(value: AvatarType): 0 | 1 {
-  return value === "bobblehead" ? 1 : 0;
+function avatarTypeToShareCode(value: AvatarType): 0 | 1 | 2 {
+  if (value === "bobblehead") {
+    return 1;
+  }
+
+  if (value === "advanced") {
+    return 2;
+  }
+
+  return 0;
 }
 
 function avatarTypeFromShareCode(value: unknown): AvatarType {
@@ -1808,7 +1823,7 @@ export default function App() {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const viewportGizmoCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewerRef = useRef<SkinViewer | null>(null);
-  const selectedOutlineRef = useRef<LineSegments | null>(null);
+  const selectedOutlineRef = useRef<Group | null>(null);
   const outerLayerVoxelMeshesRef = useRef<OuterLayerVoxelMeshes>({});
   const sceneDebugCubeRef = useRef<Mesh | null>(null);
   const sceneDebugVoxelCloneRef = useRef<Mesh | null>(null);
@@ -2188,13 +2203,19 @@ export default function App() {
     }
 
     selectedOutline.removeFromParent();
-    selectedOutline.geometry.dispose();
+    selectedOutline.traverse((descendant) => {
+      if (!(descendant instanceof LineSegments)) {
+        return;
+      }
 
-    if (Array.isArray(selectedOutline.material)) {
-      selectedOutline.material.forEach((material) => material.dispose());
-    } else {
-      selectedOutline.material.dispose();
-    }
+      descendant.geometry.dispose();
+
+      if (Array.isArray(descendant.material)) {
+        descendant.material.forEach((material) => material.dispose());
+      } else {
+        descendant.material.dispose();
+      }
+    });
 
     selectedOutlineRef.current = null;
   }
@@ -2207,21 +2228,49 @@ export default function App() {
     return POSE_BONES.find((bone) => bone.fields.some((field) => field.key === selection.id))?.id ?? "head";
   }
 
-  function getViewerBoneObject(viewer: SkinViewer, boneId: PoseBoneId): Object3D {
+  function getViewerBonePickRoot(viewer: SkinViewer, boneId: PoseBoneId): Object3D {
     switch (boneId) {
       case "head":
-        return viewer.playerObject.skin.head.outerLayer;
+        return viewer.playerObject.skin.head;
       case "torso":
-        return viewer.playerObject.skin.body.outerLayer;
+        return viewer.playerObject.skin.body;
       case "leftArm":
-        return viewer.playerObject.skin.leftArm.outerLayer;
+        return viewer.playerObject.skin.leftArm;
       case "rightArm":
-        return viewer.playerObject.skin.rightArm.outerLayer;
+        return viewer.playerObject.skin.rightArm;
       case "leftLeg":
-        return viewer.playerObject.skin.leftLeg.outerLayer;
+        return viewer.playerObject.skin.leftLeg;
       case "rightLeg":
-        return viewer.playerObject.skin.rightLeg.outerLayer;
+        return viewer.playerObject.skin.rightLeg;
     }
+  }
+
+  function getViewerBoneOutlineObjects(
+    viewer: SkinViewer,
+    boneId: PoseBoneId,
+  ): Object3D[] {
+    if (avatarType === "advanced" && isAdvancedAvatarActive(viewer)) {
+      const advancedOutlineObjects = getAdvancedAvatarOutlineObjects(viewer, boneId);
+
+      if (advancedOutlineObjects && advancedOutlineObjects.length > 0) {
+        return advancedOutlineObjects;
+      }
+    }
+
+    const targetPart = getViewerBonePickRoot(viewer, boneId) as Partial<{
+      innerLayer: Object3D;
+      outerLayer: Object3D;
+    }>;
+
+    if (showOuterLayer && targetPart.outerLayer) {
+      return [targetPart.outerLayer];
+    }
+
+    if (targetPart.innerLayer) {
+      return [targetPart.innerLayer];
+    }
+
+    return [getViewerBonePickRoot(viewer, boneId)];
   }
 
   function getViewerOuterLayerMeshes(viewer: SkinViewer): {
@@ -2267,6 +2316,10 @@ export default function App() {
 
   function rebuildOuterLayerVoxelMeshes(viewer: SkinViewer): void {
     disposeOuterLayerVoxelMeshes();
+
+    if (avatarType === "advanced") {
+      return;
+    }
 
     const textureMap = viewer.playerObject.skin.map;
     const pixelSource = getTexturePixelSource(textureMap);
@@ -2331,6 +2384,18 @@ export default function App() {
     isVisible: boolean,
     is3dOuterLayerEnabled: boolean,
   ): void {
+    if (avatarType === "advanced") {
+      setAdvancedAvatarOuterLayerVisibility(viewer, isVisible, is3dOuterLayerEnabled);
+
+      Object.values(outerLayerVoxelMeshesRef.current).forEach((voxelMesh) => {
+        if (voxelMesh) {
+          voxelMesh.visible = false;
+        }
+      });
+
+      return;
+    }
+
     if (
       is3dOuterLayerEnabled &&
       Object.keys(outerLayerVoxelMeshesRef.current).length === 0
@@ -2435,28 +2500,41 @@ export default function App() {
     }
   }
 
-  function createSelectedOutline(targetObject: Object3D): LineSegments | null {
-    if (!(targetObject instanceof Mesh)) {
-      return null;
-    }
+  function createSelectedOutline(targetObjects: Object3D[]): Group | null {
+    const selectedOutline = new Group();
+    let hasOutlineMesh = false;
 
-    const selectedOutline = new LineSegments(
-      new EdgesGeometry(targetObject.geometry),
-      new LineBasicMaterial({
-        color: 0xffb366,
-        depthTest: false,
-        transparent: true,
-        opacity: 0.72,
-        depthWrite: false,
-      }),
-    );
+    targetObjects.forEach((targetObject) => {
+      targetObject.traverse((descendant) => {
+        if (!(descendant instanceof Mesh)) {
+          return;
+        }
 
-    selectedOutline.position.copy(targetObject.position);
-    selectedOutline.quaternion.copy(targetObject.quaternion);
-    selectedOutline.scale.copy(targetObject.scale).multiplyScalar(1.035);
-    selectedOutline.renderOrder = 12;
+        const outlineSegment = new LineSegments(
+          new EdgesGeometry(descendant.geometry),
+          new LineBasicMaterial({
+            color: 0xffb366,
+            depthTest: false,
+            transparent: true,
+            opacity: 0.72,
+            depthWrite: false,
+          }),
+        );
+        const worldPosition = new Vector3();
+        const worldQuaternion = new Quaternion();
+        const worldScale = new Vector3();
 
-    return selectedOutline;
+        descendant.matrixWorld.decompose(worldPosition, worldQuaternion, worldScale);
+        outlineSegment.position.copy(worldPosition);
+        outlineSegment.quaternion.copy(worldQuaternion);
+        outlineSegment.scale.copy(worldScale).multiplyScalar(1.035);
+        outlineSegment.renderOrder = 12;
+        selectedOutline.add(outlineSegment);
+        hasOutlineMesh = true;
+      });
+    });
+
+    return hasOutlineMesh ? selectedOutline : null;
   }
 
   function syncSelectedOutline(): void {
@@ -2473,19 +2551,20 @@ export default function App() {
     }
 
     const selectedBoneId = resolveSelectedBoneId(selectedPoseSelection);
-    const selectedBoneObject = getViewerBoneObject(viewer, selectedBoneId);
-    const selectedOutline = createSelectedOutline(selectedBoneObject);
+    const selectedOutline = createSelectedOutline(
+      getViewerBoneOutlineObjects(viewer, selectedBoneId),
+    );
 
     if (!selectedOutline) {
       return;
     }
 
-    (selectedBoneObject.parent ?? viewer.scene).add(selectedOutline);
+    viewer.scene.add(selectedOutline);
     selectedOutlineRef.current = selectedOutline;
   }
 
   function updateSelectedOutline(): void {
-    selectedOutlineRef.current?.updateWorldMatrix(true, false);
+    syncSelectedOutline();
   }
 
   function publishDebugState(viewer: SkinViewer | null): void {
@@ -2814,9 +2893,10 @@ export default function App() {
     viewer.controls.minPolarAngle = Math.PI / 3.2;
     viewer.controls.maxPolarAngle = Math.PI - Math.PI / 4.5;
     centerViewerOnCharacter(viewer);
+    applyAvatarType(viewer, avatarType);
     applyPose(viewer, pose);
     applyOuterLayerPresentation(viewer, showOuterLayer, showOuterLayerIn3d);
-    updateSelectedOutline();
+    syncSelectedOutline();
     viewer.render();
     publishDebugState(viewer);
 
@@ -2824,11 +2904,11 @@ export default function App() {
     const pointer = new Vector2();
     const boneTargets = [
       { id: "head", object: viewer.playerObject.skin.head },
-      { id: "torso", object: viewer.playerObject.skin.body },
       { id: "leftArm", object: viewer.playerObject.skin.leftArm },
       { id: "rightArm", object: viewer.playerObject.skin.rightArm },
       { id: "leftLeg", object: viewer.playerObject.skin.leftLeg },
       { id: "rightLeg", object: viewer.playerObject.skin.rightLeg },
+      { id: "torso", object: viewer.playerObject.skin.body },
     ] as const;
 
     const resolveBoneFromObject = (hitObject: Object3D | null): PoseBoneId | null => {
@@ -2957,10 +3037,10 @@ export default function App() {
     }
 
     applyPose(viewer, pose);
-    updateSelectedOutline();
+    syncSelectedOutline();
     viewer.render();
     publishDebugState(viewer);
-  }, [pose]);
+  }, [avatarType, pose]);
 
   useEffect(() => {
     syncSelectedOutline();
@@ -3075,7 +3155,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [activeDocumentId, avatarType, skin?.source, skin?.modelPreference, showOuterLayer, showOuterLayerIn3d]);
+  }, [activeDocumentId, skin?.source, skin?.modelPreference, showOuterLayer, showOuterLayerIn3d]);
 
   useEffect(() => {
     const viewer = viewerRef.current;
@@ -3085,10 +3165,12 @@ export default function App() {
     }
 
     applyAvatarType(viewer, avatarType);
+    applyPose(viewer, pose);
+    applyOuterLayerPresentation(viewer, showOuterLayer, showOuterLayerIn3d);
     syncSelectedOutline();
     viewer.render();
     publishDebugState(viewer);
-  }, [avatarType, skin]);
+  }, [avatarType, pose, showOuterLayer, showOuterLayerIn3d, skin]);
 
   async function loadUsername(nextUsername: string, targetDocumentId = activeDocumentId): Promise<void> {
     const trimmedUsername = nextUsername.trim();
@@ -3860,9 +3942,21 @@ export default function App() {
   }
 
   function handleAvatarTypeChange(nextAvatarType: AvatarType): void {
+    const supportedPoseKeys = new Set(
+      getPoseBones(nextAvatarType).flatMap((bone) => bone.fields.map((field) => field.key)),
+    );
+
     updateDocument(activeDocumentId, (currentDocument) => ({
       ...currentDocument,
       avatarType: nextAvatarType,
+      selectedPoseSelection:
+        currentDocument.selectedPoseSelection.kind === "joint" &&
+        !supportedPoseKeys.has(currentDocument.selectedPoseSelection.id)
+          ? {
+              kind: "bone",
+              id: resolveSelectedBoneId(currentDocument.selectedPoseSelection),
+            }
+          : currentDocument.selectedPoseSelection,
     }));
     setError(null);
     setStatus(`Switched ${poseFileName} to the ${formatAvatarTypeLabel(nextAvatarType)} avatar type.`);
@@ -3949,6 +4043,7 @@ export default function App() {
 
       <main className="editor-body">
         <LeftSidebar
+          avatarType={avatarType}
           selectedSelection={selectedPoseSelection}
           onSelectBone={handleSelectBone}
           onSelectJoint={handleSelectJoint}
@@ -3964,6 +4059,7 @@ export default function App() {
         />
 
         <RightSidebar
+          avatarType={avatarType}
           selectedSelection={selectedPoseSelection}
           pose={pose}
           showOuterLayer={showOuterLayer}

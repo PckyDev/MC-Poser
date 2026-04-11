@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 
-import { POSE_BONES } from "../../config/pose";
-import type { PoseSelection, PoseState } from "../../types/editor";
+import { getPoseBones } from "../../config/pose";
+import type { AvatarType, PoseSelection, PoseState } from "../../types/editor";
 
 type RightSidebarProps = {
+  avatarType: AvatarType;
   selectedSelection: PoseSelection;
   pose: PoseState;
   showOuterLayer: boolean;
@@ -14,6 +15,7 @@ type RightSidebarProps = {
 };
 
 export function RightSidebar({
+  avatarType,
   selectedSelection,
   pose,
   showOuterLayer,
@@ -22,14 +24,15 @@ export function RightSidebar({
   onToggleOuterLayer,
   onToggleOuterLayerIn3d,
 }: RightSidebarProps) {
+  const visibleBones = getPoseBones(avatarType);
   const [editingFieldKey, setEditingFieldKey] = useState<keyof PoseState | null>(null);
   const [editingValue, setEditingValue] = useState("");
-  const fallbackBone = POSE_BONES[0]!;
+  const fallbackBone = visibleBones[0]!;
 
   const selectedBone =
     selectedSelection.kind === "bone"
-      ? POSE_BONES.find((bone) => bone.id === selectedSelection.id) ?? fallbackBone
-      : POSE_BONES.find((bone) => bone.fields.some((field) => field.key === selectedSelection.id)) ?? fallbackBone;
+      ? visibleBones.find((bone) => bone.id === selectedSelection.id) ?? fallbackBone
+      : visibleBones.find((bone) => bone.fields.some((field) => field.key === selectedSelection.id)) ?? fallbackBone;
 
   const selectedFields =
     selectedSelection.kind === "bone"

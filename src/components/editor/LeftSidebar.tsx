@@ -1,17 +1,21 @@
-import { POSE_BONES } from "../../config/pose";
-import type { PoseBoneId, PoseSelection, PoseState } from "../../types/editor";
+import { getPoseBones } from "../../config/pose";
+import type { AvatarType, PoseBoneId, PoseSelection, PoseState } from "../../types/editor";
 
 type LeftSidebarProps = {
+  avatarType: AvatarType;
   selectedSelection: PoseSelection;
   onSelectBone: (boneId: PoseBoneId) => void;
   onSelectJoint: (jointKey: keyof PoseState) => void;
 };
 
 export function LeftSidebar({
+  avatarType,
   selectedSelection,
   onSelectBone,
   onSelectJoint,
 }: LeftSidebarProps) {
+  const visibleBones = getPoseBones(avatarType);
+
   return (
     <aside className="editor-sidebar editor-sidebar--left">
       <section className="editor-panel editor-panel--stretch">
@@ -23,7 +27,7 @@ export function LeftSidebar({
 
         <div className="panel-content panel-content--scroll panel-content--stacked">
           <div className="bone-tree">
-            {POSE_BONES.map((bone) => (
+            {visibleBones.map((bone) => (
               <div key={bone.id} className="bone-tree-group">
                 <button
                   className={

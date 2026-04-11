@@ -22,6 +22,11 @@ const AVATAR_TYPE_OPTIONS: Array<{
     label: "Bobblehead",
     value: "bobblehead",
   },
+  {
+    description: "Segmented limbs with elbow, knee, and spine bending.",
+    label: "Advanced",
+    value: "advanced",
+  },
 ];
 
 type NewFileModalProps = {

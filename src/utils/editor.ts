@@ -1,6 +1,7 @@
 import type { SkinViewer } from "skinview3d";
 
 import type { ArmModel, AvatarType, ModelPreference, PoseState } from "../types/editor";
+import { applyAdvancedAvatarPose, syncAdvancedAvatarRig } from "./avatarRig";
 
 const AVATAR_TYPE_DIMENSIONS: Record<
   AvatarType,
@@ -17,6 +18,10 @@ const AVATAR_TYPE_DIMENSIONS: Record<
     bodyScale: 0.72,
     headScale: 1.5,
   },
+  advanced: {
+    bodyScale: 1,
+    headScale: 1,
+  },
 };
 
 export function clonePose(pose: PoseState): PoseState {
@@ -28,6 +33,10 @@ function toRadians(value: number): number {
 }
 
 export function applyPose(viewer: SkinViewer, pose: PoseState): void {
+  if (applyAdvancedAvatarPose(viewer, pose)) {
+    return;
+  }
+
   const skin = viewer.playerObject.skin;
 
   skin.head.rotation.set(toRadians(pose.headPitch), toRadians(pose.headYaw), 0);
@@ -55,6 +64,8 @@ export function applyPose(viewer: SkinViewer, pose: PoseState): void {
 }
 
 export function applyAvatarType(viewer: SkinViewer, avatarType: AvatarType): void {
+  syncAdvancedAvatarRig(viewer, avatarType === "advanced");
+
   const skin = viewer.playerObject.skin;
   const { bodyScale, headScale } = AVATAR_TYPE_DIMENSIONS[avatarType];
 
@@ -71,6 +82,13 @@ export function applyAvatarType(viewer: SkinViewer, avatarType: AvatarType): voi
   skin.rightArm.position.set(-5 * bodyScale, -2 * bodyScale, 0);
   skin.leftLeg.position.set(1.9 * bodyScale, -12 * bodyScale, -0.1 * bodyScale);
   skin.rightLeg.position.set(-1.9 * bodyScale, -12 * bodyScale, -0.1 * bodyScale);
+
+  if (avatarType === "advanced") {
+    skin.body.position.set(0, -6 * bodyScale, 0);
+    skin.head.position.set(0, 6 * bodyScale, 0);
+    skin.leftArm.position.set(5 * bodyScale, 6 * bodyScale, 0);
+    skin.rightArm.position.set(-5 * bodyScale, 6 * bodyScale, 0);
+  }
 }
 
 export function formatPresetName(value: string): string {
@@ -78,7 +96,15 @@ export function formatPresetName(value: string): string {
 }
 
 export function formatAvatarTypeLabel(value: AvatarType): string {
-  return value === "bobblehead" ? "Bobblehead" : "Default";
+  if (value === "bobblehead") {
+    return "Bobblehead";
+  }
+
+  if (value === "advanced") {
+    return "Advanced";
+  }
+
+  return "Default";
 }
 
 export function formatModelLabel(

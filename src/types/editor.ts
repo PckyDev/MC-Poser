@@ -1,23 +1,30 @@
 export type ModelPreference = "default" | "slim" | "auto-detect";
 export type ArmModel = "default" | "slim";
-export type AvatarType = "default" | "bobblehead";
+export type AvatarType = "default" | "bobblehead" | "advanced";
 
 export type PoseState = {
   headPitch: number;
   headYaw: number;
+  bodyPitch: number;
   bodyYaw: number;
+  bodyRoll: number;
   leftArmPitch: number;
   leftArmYaw: number;
   leftArmRoll: number;
+  leftElbowPitch: number;
   rightArmPitch: number;
   rightArmYaw: number;
   rightArmRoll: number;
+  rightElbowPitch: number;
   leftLegPitch: number;
   leftLegYaw: number;
   leftLegRoll: number;
+  leftKneePitch: number;
   rightLegPitch: number;
   rightLegYaw: number;
   rightLegRoll: number;
+  rightKneePitch: number;
+  spineBend: number;
 };
 
 export type PoseBoneId = "head" | "torso" | "leftArm" | "rightArm" | "leftLeg" | "rightLeg";
