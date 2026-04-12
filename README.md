@@ -73,6 +73,6 @@ The existing [wrangler.toml](wrangler.toml) file matches that setup.
 
 ## Project notes
 
-- Username lookups are handled through Mojang profile APIs.
+- Username lookups are handled through Mojang profile APIs
 - Shared project and image links are encoded in the URL hash.
 - The client app builds to static assets in `dist`, while the API route is provided through `functions/api/skin.ts`.
