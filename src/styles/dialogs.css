@@ -253,6 +253,50 @@
   background: #262c35;
 }
 
+.startup-support-banner {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(219, 119, 49, 0.2);
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.startup-support-copy-wrap {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.startup-support-title {
+  color: var(--text-main);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.startup-support-copy {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.startup-support-button {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.startup-support-button-icon {
+  font-size: 0.92rem;
+}
+
 .startup-choice-card,
 .startup-section {
   padding: 0.9rem;
@@ -485,6 +529,110 @@
 
 .share-modal {
   width: min(1080px, 100%);
+}
+
+.help-modal {
+  position: relative;
+  width: min(960px, 100%);
+}
+
+.help-modal-close-button {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 3;
+}
+
+.help-modal-hero {
+  padding-right: 4.65rem;
+}
+
+.help-modal-copy {
+  gap: 0.95rem;
+}
+
+.help-modal-discord-card {
+  display: grid;
+  gap: 0.4rem;
+  width: fit-content;
+  min-width: min(100%, 17rem);
+  padding: 0.8rem 0.85rem;
+  border: 1px solid rgba(88, 101, 242, 0.28);
+  background: rgba(88, 101, 242, 0.1);
+}
+
+.help-modal-discord-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-main);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.help-modal-discord-username {
+  width: fit-content;
+  padding: 0.22rem 0.48rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.16);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.help-modal-discord-copy {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.help-modal-image {
+  bottom: -22rem;
+}
+
+.help-modal-body {
+  display: grid;
+  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
+  gap: 1rem;
+  padding: 1rem 1.2rem 1.2rem;
+  background: #262c35;
+}
+
+.help-modal-card {
+  display: grid;
+  gap: 0.9rem;
+  align-content: start;
+  padding: 0.95rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.help-modal-social-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.help-social-link {
+  width: 100%;
+  min-height: 2.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  text-decoration: none;
+}
+
+.help-social-link-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.help-social-link-arrow {
+  font-size: 0.76rem;
+  opacity: 0.7;
 }
 
 .share-modal-body {

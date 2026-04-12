@@ -1,4 +1,5 @@
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faKoFi } from "@fortawesome/free-brands-svg-icons";
 import {
   faImage,
   faShareNodes,
@@ -95,10 +96,6 @@ export function StartupModal({
             >
               Create New File
             </button>
-
-            <p className="panel-note startup-choice-note">
-              Best when you are starting a new composition, testing a skin, or setting up something to export.
-            </p>
           </section>
 
           <section className="startup-choice-card startup-choice-card--secondary">
@@ -117,11 +114,25 @@ export function StartupModal({
             >
               Open Existing File
             </button>
-
-            <p className="panel-note startup-choice-note">
-              Use this when you already have an MC Poser project and just want to keep working.
-            </p>
           </section>
+          <aside className="startup-support-banner" aria-label="Support MC Poser on Ko-Fi">
+            <div className="startup-support-copy-wrap">
+              <strong className="startup-support-title">Support MC Poser</strong>
+              <p className="startup-support-copy">
+                If MC Poser is useful to you, you can help support future updates on Ko-Fi.
+              </p>
+            </div>
+
+            <a
+              className="toolbar-button toolbar-button--accent startup-support-button"
+              href="https://ko-fi.com/pockydev"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <FontAwesomeIcon className="startup-support-button-icon" icon={faKoFi} />
+              <span>Support on Ko-Fi</span>
+            </a>
+          </aside>
         </div>
       </div>
     </div>

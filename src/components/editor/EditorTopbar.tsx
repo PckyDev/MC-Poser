@@ -10,14 +10,17 @@ type EditorTopbarProps = {
   isShareDisabled: boolean;
   selectedPreset: PosePresetName | null;
   onOpenDocumentModal: () => void;
+  onOpenIdeasModal: () => void;
   onOpenNewFileModal: () => void;
   onOpenPoseFile: () => void;
+  onOpenIssueModal: () => void;
   onSavePoseFile: () => void;
   onSavePoseFileAs: () => void;
   onApplyPreset: (preset: PosePresetName) => void;
   onResetPose: () => void;
   onResetCamera: () => void;
   onOpenShareModal: () => void;
+  onOpenSupportLink: () => void;
   onOpenExportModal: () => void;
 };
 
@@ -26,31 +29,37 @@ export function EditorTopbar({
   isShareDisabled,
   selectedPreset,
   onOpenDocumentModal,
+  onOpenIdeasModal,
   onOpenNewFileModal,
   onOpenPoseFile,
+  onOpenIssueModal,
   onSavePoseFile,
   onSavePoseFileAs,
   onApplyPreset,
   onResetPose,
   onResetCamera,
   onOpenShareModal,
+  onOpenSupportLink,
   onOpenExportModal,
 }: EditorTopbarProps) {
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
   const [isPoseMenuOpen, setIsPoseMenuOpen] = useState(false);
   const [isViewMenuOpen, setIsViewMenuOpen] = useState(false);
+  const [isHelpMenuOpen, setIsHelpMenuOpen] = useState(false);
   const fileMenuRef = useRef<HTMLDivElement | null>(null);
   const poseMenuRef = useRef<HTMLDivElement | null>(null);
   const viewMenuRef = useRef<HTMLDivElement | null>(null);
+  const helpMenuRef = useRef<HTMLDivElement | null>(null);
 
   function closeAllMenus(): void {
     setIsFileMenuOpen(false);
     setIsPoseMenuOpen(false);
     setIsViewMenuOpen(false);
+    setIsHelpMenuOpen(false);
   }
 
   useEffect(() => {
-    if (!isFileMenuOpen && !isPoseMenuOpen && !isViewMenuOpen) {
+    if (!isFileMenuOpen && !isPoseMenuOpen && !isViewMenuOpen && !isHelpMenuOpen) {
       return;
     }
 
@@ -59,8 +68,14 @@ export function EditorTopbar({
       const clickedOutsideFileMenu = fileMenuRef.current && !fileMenuRef.current.contains(targetNode);
       const clickedOutsidePoseMenu = poseMenuRef.current && !poseMenuRef.current.contains(targetNode);
       const clickedOutsideViewMenu = viewMenuRef.current && !viewMenuRef.current.contains(targetNode);
+      const clickedOutsideHelpMenu = helpMenuRef.current && !helpMenuRef.current.contains(targetNode);
 
-      if (clickedOutsideFileMenu && clickedOutsidePoseMenu && clickedOutsideViewMenu) {
+      if (
+        clickedOutsideFileMenu &&
+        clickedOutsidePoseMenu &&
+        clickedOutsideViewMenu &&
+        clickedOutsideHelpMenu
+      ) {
         closeAllMenus();
       }
     };
@@ -78,7 +93,7 @@ export function EditorTopbar({
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isFileMenuOpen, isPoseMenuOpen, isViewMenuOpen]);
+  }, [isFileMenuOpen, isHelpMenuOpen, isPoseMenuOpen, isViewMenuOpen]);
 
   function handleFileAction(action: () => void): void {
     action();
@@ -96,6 +111,11 @@ export function EditorTopbar({
   }
 
   function handleViewAction(action: () => void): void {
+    action();
+    closeAllMenus();
+  }
+
+  function handleHelpAction(action: () => void): void {
     action();
     closeAllMenus();
   }
@@ -118,6 +138,7 @@ export function EditorTopbar({
               setIsFileMenuOpen((currentValue) => !currentValue);
               setIsPoseMenuOpen(false);
               setIsViewMenuOpen(false);
+              setIsHelpMenuOpen(false);
             }}
           >
             File
@@ -155,6 +176,7 @@ export function EditorTopbar({
               setIsPoseMenuOpen((currentValue) => !currentValue);
               setIsFileMenuOpen(false);
               setIsViewMenuOpen(false);
+              setIsHelpMenuOpen(false);
             }}
           >
             Pose
@@ -195,6 +217,7 @@ export function EditorTopbar({
               setIsViewMenuOpen((currentValue) => !currentValue);
               setIsFileMenuOpen(false);
               setIsPoseMenuOpen(false);
+              setIsHelpMenuOpen(false);
             }}
           >
             View
@@ -208,6 +231,41 @@ export function EditorTopbar({
             <div className="menu-dropdown-panel" role="menu" aria-label="View actions">
               <button className="menu-dropdown-item" type="button" onClick={() => handleViewAction(onResetCamera)}>
                 Reset Camera
+              </button>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="menu-dropdown" ref={helpMenuRef}>
+          <button
+            className="menu-button menu-button--dropdown"
+            type="button"
+            aria-expanded={isHelpMenuOpen}
+            onClick={() => {
+              setIsHelpMenuOpen((currentValue) => !currentValue);
+              setIsFileMenuOpen(false);
+              setIsPoseMenuOpen(false);
+              setIsViewMenuOpen(false);
+            }}
+          >
+            Help
+            <FontAwesomeIcon
+              className={isHelpMenuOpen ? "menu-button-caret is-open" : "menu-button-caret"}
+              icon={faChevronDown}
+            />
+          </button>
+
+          {isHelpMenuOpen ? (
+            <div className="menu-dropdown-panel" role="menu" aria-label="Help actions">
+              <button className="menu-dropdown-item" type="button" onClick={() => handleHelpAction(onOpenSupportLink)}>
+                Support on Ko-Fi
+              </button>
+              <div className="menu-dropdown-divider" />
+              <button className="menu-dropdown-item" type="button" onClick={() => handleHelpAction(onOpenIdeasModal)}>
+                Suggest Ideas
+              </button>
+              <button className="menu-dropdown-item" type="button" onClick={() => handleHelpAction(onOpenIssueModal)}>
+                Report Bug/Issue
               </button>
             </div>
           ) : null}

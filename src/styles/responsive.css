@@ -23,6 +23,15 @@
     bottom: -10rem;
   }
 
+  .help-modal-body,
+  .help-modal-social-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .help-modal-image {
+    bottom: -10.8rem;
+  }
+
   .toolbar-strip {
     justify-content: start;
   }
@@ -54,6 +63,26 @@
     grid-template-columns: 1fr;
   }
 
+  .startup-support-banner {
+    display: grid;
+    justify-items: start;
+    gap: 0.75rem;
+  }
+
+  .startup-support-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .help-modal-close-button {
+    top: 0.8rem;
+    right: 0.8rem;
+  }
+
+  .help-modal-hero {
+    padding-right: 1.2rem;
+  }
+
   .startup-hero-media {
     min-height: 10rem;
   }
@@ -62,6 +91,10 @@
     width: 14.4rem;
     right: 0.2rem;
     bottom: -7.35rem;
+  }
+
+  .help-modal-image {
+    bottom: -8.1rem;
   }
 
   .startup-config-grid,

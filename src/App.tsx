@@ -38,6 +38,10 @@ import {
   type ExportFileType,
   type ExportSettings,
 } from "./components/editor/ExportModal";
+import {
+  HelpContactModal,
+  type HelpContactModalKind,
+} from "./components/editor/HelpContactModal";
 import { LeftSidebar } from "./components/editor/LeftSidebar";
 import { NewFileModal } from "./components/editor/NewFileModal";
 import { RightSidebar } from "./components/editor/RightSidebar";
@@ -1845,6 +1849,7 @@ export default function App() {
   const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [helpContactModalKind, setHelpContactModalKind] = useState<HelpContactModalKind | null>(null);
   const [isStartupModalOpen, setIsStartupModalOpen] = useState(true);
   const [isNewFileModalOpen, setIsNewFileModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -2820,6 +2825,22 @@ export default function App() {
 
   function openDocumentModal(): void {
     setIsDocumentModalOpen(true);
+  }
+
+  function closeHelpContactModal(): void {
+    setHelpContactModalKind(null);
+  }
+
+  function openIdeasModal(): void {
+    setHelpContactModalKind("ideas");
+  }
+
+  function openIssueModal(): void {
+    setHelpContactModalKind("issues");
+  }
+
+  function openSupportLink(): void {
+    window.open("https://ko-fi.com/pockydev", "_blank", "noopener,noreferrer");
   }
 
   function closeShareModal(): void {
@@ -4017,8 +4038,10 @@ export default function App() {
         isShareDisabled={isShareDisabled}
         selectedPreset={selectedPreset}
         onOpenDocumentModal={openDocumentModal}
+        onOpenIdeasModal={openIdeasModal}
         onOpenNewFileModal={openNewFileModal}
         onOpenPoseFile={handleOpenPoseFilePicker}
+        onOpenIssueModal={openIssueModal}
         onSavePoseFile={() => {
           void saveWorkspaceFile(false);
         }}
@@ -4029,6 +4052,7 @@ export default function App() {
         onResetPose={resetPose}
         onResetCamera={handleResetCamera}
         onOpenShareModal={openShareModal}
+        onOpenSupportLink={openSupportLink}
         onOpenExportModal={openExportModal}
       />
 
@@ -4170,6 +4194,11 @@ export default function App() {
         onCopyImageLink={() => {
           void handleCopyImageShareLink();
         }}
+      />
+
+      <HelpContactModal
+        kind={helpContactModalKind}
+        onClose={closeHelpContactModal}
       />
 
       <StartupModal
