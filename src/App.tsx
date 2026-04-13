@@ -79,6 +79,8 @@ import {
   formatModelLabel,
   formatPresetName,
   normalizePoseFileName,
+  setViewerInnerLayerVisible,
+  setViewerOuterLayerVisible,
 } from "./utils/editor";
 import {
   getAdvancedAvatarOutlineObjects,
@@ -2408,7 +2410,7 @@ export default function App() {
       rebuildOuterLayerVoxelMeshes(viewer);
     }
 
-    viewer.playerObject.skin.setOuterLayerVisible(isVisible && !is3dOuterLayerEnabled);
+    setViewerOuterLayerVisible(viewer, isVisible && !is3dOuterLayerEnabled);
 
     Object.values(outerLayerVoxelMeshesRef.current).forEach((voxelMesh) => {
       if (voxelMesh) {
@@ -3136,7 +3138,7 @@ export default function App() {
           return;
         }
 
-        viewer.playerObject.skin.setInnerLayerVisible(true);
+        setViewerInnerLayerVisible(viewer, true);
         applyAvatarType(viewer, avatarType);
         rebuildOuterLayerVoxelMeshes(viewer);
         applyOuterLayerPresentation(viewer, showOuterLayer, showOuterLayerIn3d);

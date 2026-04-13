@@ -120,6 +120,7 @@ const HEAD_FIELDS: PoseFieldConfig[] = [
 ];
 
 const TORSO_FIELDS: PoseFieldConfig[] = [
+  { key: "bodyPitch", label: "Body pitch", min: -70, max: 70 },
   { key: "bodyYaw", label: "Body yaw", min: -50, max: 50 },
   { key: "spineBend", label: "Spine bend", min: -70, max: 70 },
 ];
@@ -152,7 +153,7 @@ const RIGHT_LEG_FIELDS: PoseFieldConfig[] = [
   { key: "rightKneePitch", label: "Right knee bend", min: 0, max: 150 },
 ];
 
-const BASIC_TORSO_FIELDS = TORSO_FIELDS.filter((field) => field.key === "bodyYaw");
+const BASIC_TORSO_FIELDS = TORSO_FIELDS.filter((field) => field.key !== "spineBend");
 const BASIC_LEFT_ARM_FIELDS = LEFT_ARM_FIELDS.filter((field) => field.key !== "leftElbowPitch");
 const BASIC_RIGHT_ARM_FIELDS = RIGHT_ARM_FIELDS.filter((field) => field.key !== "rightElbowPitch");
 const BASIC_LEFT_LEG_FIELDS = LEFT_LEG_FIELDS.filter((field) => field.key !== "leftKneePitch");

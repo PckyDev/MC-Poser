@@ -1,7 +1,19 @@
 import type { SkinViewer } from "skinview3d";
+import { Group, type Object3D } from "three";
 
 import type { ArmModel, AvatarType, ModelPreference, PoseState } from "../types/editor";
 import { applyAdvancedAvatarPose, syncAdvancedAvatarRig } from "./avatarRig";
+
+const TORSO_JOINT_RIG_STATE_KEY = "__mcPoserTorsoJointRig";
+
+type SkinPartObject = Object3D & {
+  innerLayer: Object3D;
+  outerLayer: Object3D;
+};
+
+type TorsoJointRigState = {
+  root: Group;
+};
 
 const AVATAR_TYPE_DIMENSIONS: Record<
   AvatarType,
@@ -32,15 +44,80 @@ function toRadians(value: number): number {
   return (value * Math.PI) / 180;
 }
 
+function getSkinParts(viewer: SkinViewer): [
+  SkinPartObject,
+  SkinPartObject,
+  SkinPartObject,
+  SkinPartObject,
+  SkinPartObject,
+  SkinPartObject,
+] {
+  const skin = viewer.playerObject.skin;
+
+  return [
+    skin.head as SkinPartObject,
+    skin.body as SkinPartObject,
+    skin.leftArm as SkinPartObject,
+    skin.rightArm as SkinPartObject,
+    skin.leftLeg as SkinPartObject,
+    skin.rightLeg as SkinPartObject,
+  ];
+}
+
+function getStoredTorsoJointRig(viewer: SkinViewer): TorsoJointRigState | null {
+  return (viewer.playerObject.skin.userData[TORSO_JOINT_RIG_STATE_KEY] as TorsoJointRigState | undefined) ?? null;
+}
+
+function ensureTorsoJointRig(viewer: SkinViewer): TorsoJointRigState {
+  const skin = viewer.playerObject.skin;
+  const storedState = getStoredTorsoJointRig(viewer);
+
+  if (storedState?.root.parent === skin) {
+    return storedState;
+  }
+
+  const torsoJointRoot = new Group();
+  torsoJointRoot.name = "torso-joint-root";
+  skin.add(torsoJointRoot);
+  torsoJointRoot.add(skin.body, skin.head, skin.leftArm, skin.rightArm);
+
+  const nextState = {
+    root: torsoJointRoot,
+  };
+
+  skin.userData[TORSO_JOINT_RIG_STATE_KEY] = nextState;
+  return nextState;
+}
+
+export function setViewerInnerLayerVisible(viewer: SkinViewer, isVisible: boolean): void {
+  getSkinParts(viewer).forEach((part) => {
+    part.innerLayer.visible = isVisible;
+  });
+}
+
+export function setViewerOuterLayerVisible(viewer: SkinViewer, isVisible: boolean): void {
+  getSkinParts(viewer).forEach((part) => {
+    part.outerLayer.visible = isVisible;
+  });
+}
+
 export function applyPose(viewer: SkinViewer, pose: PoseState): void {
+  const torsoJointRig = ensureTorsoJointRig(viewer);
+
+  torsoJointRig.root.rotation.set(
+    toRadians(pose.bodyPitch),
+    toRadians(pose.bodyYaw),
+    toRadians(pose.bodyRoll),
+  );
+
   if (applyAdvancedAvatarPose(viewer, pose)) {
     return;
   }
 
   const skin = viewer.playerObject.skin;
 
+  skin.body.rotation.set(0, 0, 0);
   skin.head.rotation.set(toRadians(pose.headPitch), toRadians(pose.headYaw), 0);
-  skin.body.rotation.set(0, toRadians(pose.bodyYaw), 0);
   skin.leftArm.rotation.set(
     toRadians(pose.leftArmPitch),
     toRadians(pose.leftArmYaw),
@@ -64,10 +141,12 @@ export function applyPose(viewer: SkinViewer, pose: PoseState): void {
 }
 
 export function applyAvatarType(viewer: SkinViewer, avatarType: AvatarType): void {
-  syncAdvancedAvatarRig(viewer, avatarType === "advanced");
-
   const skin = viewer.playerObject.skin;
+  const torsoJointRig = ensureTorsoJointRig(viewer);
   const { bodyScale, headScale } = AVATAR_TYPE_DIMENSIONS[avatarType];
+
+  torsoJointRig.root.rotation.set(0, 0, 0);
+  torsoJointRig.root.position.set(0, -12 * bodyScale, 0);
 
   skin.head.scale.setScalar(headScale);
   skin.body.scale.setScalar(bodyScale);
@@ -76,15 +155,17 @@ export function applyAvatarType(viewer: SkinViewer, avatarType: AvatarType): voi
   skin.leftLeg.scale.setScalar(bodyScale);
   skin.rightLeg.scale.setScalar(bodyScale);
 
-  skin.head.position.set(0, 0, 0);
-  skin.body.position.set(0, -6 * bodyScale, 0);
-  skin.leftArm.position.set(5 * bodyScale, -2 * bodyScale, 0);
-  skin.rightArm.position.set(-5 * bodyScale, -2 * bodyScale, 0);
+  skin.head.position.set(0, 12 * bodyScale, 0);
+  skin.body.position.set(0, 6 * bodyScale, 0);
+  skin.leftArm.position.set(5 * bodyScale, 10 * bodyScale, 0);
+  skin.rightArm.position.set(-5 * bodyScale, 10 * bodyScale, 0);
   skin.leftLeg.position.set(1.9 * bodyScale, -12 * bodyScale, -0.1 * bodyScale);
   skin.rightLeg.position.set(-1.9 * bodyScale, -12 * bodyScale, -0.1 * bodyScale);
 
+  syncAdvancedAvatarRig(viewer, avatarType === "advanced");
+
   if (avatarType === "advanced") {
-    skin.body.position.set(0, -6 * bodyScale, 0);
+    skin.body.position.set(0, 6 * bodyScale, 0);
     skin.head.position.set(0, 6 * bodyScale, 0);
     skin.leftArm.position.set(5 * bodyScale, 6 * bodyScale, 0);
     skin.rightArm.position.set(-5 * bodyScale, 6 * bodyScale, 0);

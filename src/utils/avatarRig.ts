@@ -1171,7 +1171,7 @@ export function syncAdvancedAvatarRig(viewer: SkinViewer, isAdvanced: boolean): 
   state.torsoRig.spineJoint.add(skin.leftArm);
   state.torsoRig.spineJoint.add(skin.rightArm);
 
-  skin.body.position.set(0, -6, 0);
+  skin.body.position.set(0, 6, 0);
   skin.head.position.set(0, 6, 0);
   skin.leftArm.position.set(5, 6, 0);
   skin.rightArm.position.set(-5, 6, 0);
@@ -1185,10 +1185,9 @@ export function applyAdvancedAvatarPose(viewer: SkinViewer, pose: PoseState): bo
   }
 
   const skin = viewer.playerObject.skin;
-  const spineBend = pose.spineBend !== 0 ? pose.spineBend : pose.bodyPitch;
 
-  skin.body.rotation.set(0, toRadians(pose.bodyYaw), 0);
-  state.torsoRig.spineJoint.rotation.set(-toRadians(spineBend), 0, 0);
+  skin.body.rotation.set(0, 0, 0);
+  state.torsoRig.spineJoint.rotation.set(-toRadians(pose.spineBend), 0, 0);
   skin.head.rotation.set(toRadians(pose.headPitch), toRadians(pose.headYaw), 0);
   skin.leftArm.rotation.set(
     toRadians(pose.leftArmPitch),
