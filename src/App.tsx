@@ -2688,6 +2688,7 @@ export default function App() {
               [selection.id]: clampPoseValue(selection.id, object.rotation.y * (180 / Math.PI)),
             }),
           };
+        case "headRoll":
         case "leftArmRoll":
         case "rightArmRoll":
         case "leftLegRoll":
@@ -2714,11 +2715,12 @@ export default function App() {
           object: viewer.playerObject.skin.head,
           showX: true,
           showY: true,
-          showZ: false,
+          showZ: true,
           updatePoseFromObject: (nextPose, object) => ({
             ...nextPose,
             headPitch: clampPoseValue("headPitch", object.rotation.x * (180 / Math.PI)),
             headYaw: clampPoseValue("headYaw", object.rotation.y * (180 / Math.PI)),
+            headRoll: clampPoseValue("headRoll", object.rotation.z * (180 / Math.PI)),
           }),
         };
       case "torso":
@@ -3103,6 +3105,10 @@ export default function App() {
 
   function openSupportLink(): void {
     window.open("https://ko-fi.com/pockydev", "_blank", "noopener,noreferrer");
+  }
+
+  function openGitHubRepo(): void {
+    window.open("https://github.com/PckyDev/MC-Poser", "_blank", "noopener,noreferrer");
   }
 
   function closeShareModal(): void {
@@ -4390,6 +4396,7 @@ export default function App() {
         isShareDisabled={isShareDisabled}
         selectedPreset={selectedPreset}
         onOpenDocumentModal={openDocumentModal}
+        onOpenGitHubRepo={openGitHubRepo}
         onOpenIdeasModal={openIdeasModal}
         onOpenNewFileModal={openNewFileModal}
         onOpenPoseFile={handleOpenPoseFilePicker}

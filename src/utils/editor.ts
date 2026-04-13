@@ -121,7 +121,11 @@ export function applyPose(viewer: SkinViewer, pose: PoseState): void {
   const skin = viewer.playerObject.skin;
 
   skin.body.rotation.set(0, 0, 0);
-  skin.head.rotation.set(toRadians(pose.headPitch), toRadians(pose.headYaw), 0);
+  skin.head.rotation.set(
+    toRadians(pose.headPitch),
+    toRadians(pose.headYaw),
+    toRadians(pose.headRoll),
+  );
   skin.leftArm.rotation.set(
     toRadians(pose.leftArmPitch),
     toRadians(pose.leftArmYaw),

@@ -1214,7 +1214,11 @@ export function applyAdvancedAvatarPose(viewer: SkinViewer, pose: PoseState): bo
 
   skin.body.rotation.set(0, 0, 0);
   state.torsoRig.spineJoint.rotation.set(-toRadians(pose.spineBend), 0, 0);
-  skin.head.rotation.set(toRadians(pose.headPitch), toRadians(pose.headYaw), 0);
+  skin.head.rotation.set(
+    toRadians(pose.headPitch),
+    toRadians(pose.headYaw),
+    toRadians(pose.headRoll),
+  );
   skin.leftArm.rotation.set(
     toRadians(pose.leftArmPitch),
     toRadians(pose.leftArmYaw),

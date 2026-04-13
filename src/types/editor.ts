@@ -25,6 +25,7 @@ export type PoseState = {
   rightLegRoll: number;
   rightKneePitch: number;
   spineBend: number;
+  headRoll: number;
 };
 
 export type PoseBoneId = "head" | "torso" | "leftArm" | "rightArm" | "leftLeg" | "rightLeg";

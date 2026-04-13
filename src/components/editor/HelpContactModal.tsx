@@ -41,9 +41,9 @@ const SOCIAL_LINKS = [
     label: "Reddit",
   },
   {
-    href: "https://github.com/PckyDev",
+    href: "https://github.com/PckyDev/MC-Poser/issues/new",
     icon: faGithub,
-    label: "GitHub",
+    label: "GitHub Issues",
   },
   {
     href: "https://www.youtube.com/@PckyDev",

@@ -10,6 +10,7 @@ type EditorTopbarProps = {
   isShareDisabled: boolean;
   selectedPreset: PosePresetName | null;
   onOpenDocumentModal: () => void;
+  onOpenGitHubRepo: () => void;
   onOpenIdeasModal: () => void;
   onOpenNewFileModal: () => void;
   onOpenPoseFile: () => void;
@@ -29,6 +30,7 @@ export function EditorTopbar({
   isShareDisabled,
   selectedPreset,
   onOpenDocumentModal,
+  onOpenGitHubRepo,
   onOpenIdeasModal,
   onOpenNewFileModal,
   onOpenPoseFile,
@@ -259,6 +261,9 @@ export function EditorTopbar({
             <div className="menu-dropdown-panel" role="menu" aria-label="Help actions">
               <button className="menu-dropdown-item" type="button" onClick={() => handleHelpAction(onOpenSupportLink)}>
                 Support on Ko-Fi
+              </button>
+              <button className="menu-dropdown-item" type="button" onClick={() => handleHelpAction(onOpenGitHubRepo)}>
+                View on GitHub
               </button>
               <div className="menu-dropdown-divider" />
               <button className="menu-dropdown-item" type="button" onClick={() => handleHelpAction(onOpenIdeasModal)}>

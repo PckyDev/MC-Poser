@@ -32,6 +32,7 @@ export const NEUTRAL_POSE: PoseState = {
   rightLegRoll: 0,
   rightKneePitch: 0,
   spineBend: 0,
+  headRoll: 0,
 };
 
 export const POSE_PRESETS = {
@@ -58,6 +59,7 @@ export const POSE_PRESETS = {
     rightLegRoll: 0,
     rightKneePitch: 0,
     spineBend: 0,
+    headRoll: 0,
   },
   neutral: NEUTRAL_POSE,
   wave: {
@@ -83,6 +85,7 @@ export const POSE_PRESETS = {
     rightLegRoll: 0,
     rightKneePitch: 0,
     spineBend: 0,
+    headRoll: 0,
   },
   stride: {
     headPitch: 4,
@@ -107,6 +110,7 @@ export const POSE_PRESETS = {
     rightLegRoll: 0,
     rightKneePitch: 0,
     spineBend: 0,
+    headRoll: 0,
   },
 } as const satisfies Record<string, PoseState>;
 
@@ -117,6 +121,7 @@ export const PRESET_NAMES = Object.keys(POSE_PRESETS) as PosePresetName[];
 const HEAD_FIELDS: PoseFieldConfig[] = [
   { key: "headPitch", label: "Head pitch", min: -80, max: 80 },
   { key: "headYaw", label: "Head yaw", min: -90, max: 90 },
+  { key: "headRoll", label: "Head roll", min: -70, max: 70 },
 ];
 
 const TORSO_FIELDS: PoseFieldConfig[] = [
