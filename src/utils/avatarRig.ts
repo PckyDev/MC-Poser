@@ -1130,6 +1130,32 @@ export function isAdvancedAvatarActive(viewer: SkinViewer): boolean {
   return Boolean(state?.torsoRig.root.visible);
 }
 
+export function getAdvancedAvatarJointObject(
+  viewer: SkinViewer,
+  poseKey: keyof PoseState,
+): Object3D | null {
+  const state = getStoredAdvancedRig(viewer);
+
+  if (!state || !state.torsoRig.root.visible) {
+    return null;
+  }
+
+  switch (poseKey) {
+    case "spineBend":
+      return state.torsoRig.spineJoint;
+    case "leftElbowPitch":
+      return state.leftArmRig.joint;
+    case "rightElbowPitch":
+      return state.rightArmRig.joint;
+    case "leftKneePitch":
+      return state.leftLegRig.joint;
+    case "rightKneePitch":
+      return state.rightLegRig.joint;
+    default:
+      return null;
+  }
+}
+
 export function syncAdvancedAvatarRig(viewer: SkinViewer, isAdvanced: boolean): void {
   const storedState = getStoredAdvancedRig(viewer);
 

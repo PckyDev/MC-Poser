@@ -101,6 +101,10 @@ export function setViewerOuterLayerVisible(viewer: SkinViewer, isVisible: boolea
   });
 }
 
+export function getViewerTorsoJointRoot(viewer: SkinViewer): Object3D {
+  return ensureTorsoJointRig(viewer).root;
+}
+
 export function applyPose(viewer: SkinViewer, pose: PoseState): void {
   const torsoJointRig = ensureTorsoJointRig(viewer);
 

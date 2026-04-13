@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { SkinViewer } from "skinview3d";
+import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
 import {
   AmbientLight,
   Box3,
@@ -78,11 +79,13 @@ import {
   formatAvatarTypeLabel,
   formatModelLabel,
   formatPresetName,
+  getViewerTorsoJointRoot,
   normalizePoseFileName,
   setViewerInnerLayerVisible,
   setViewerOuterLayerVisible,
 } from "./utils/editor";
 import {
+  getAdvancedAvatarJointObject,
   getAdvancedAvatarOutlineObjects,
   isAdvancedAvatarActive,
   setAdvancedAvatarOuterLayerVisibility,
@@ -207,6 +210,14 @@ type ViewportGizmo = {
   resize: () => void;
 };
 
+type RotationGizmoBinding = {
+  object: Object3D;
+  showX: boolean;
+  showY: boolean;
+  showZ: boolean;
+  updatePoseFromObject: (nextPose: PoseState, object: Object3D) => PoseState;
+};
+
 type TexturePixelSource = {
   data: Uint8ClampedArray;
   width: number;
@@ -304,6 +315,9 @@ type DebugWindow = Window & {
 };
 
 const POSE_KEYS = Object.keys(NEUTRAL_POSE) as Array<keyof PoseState>;
+const POSE_FIELD_LIMITS = new Map(
+  POSE_BONES.flatMap((bone) => bone.fields.map((field) => [field.key, field] as const)),
+);
 const POSE_BONE_ID_SET = new Set<PoseBoneId>(POSE_BONES.map((bone) => bone.id));
 const POSE_PRESET_NAME_SET = new Set<PosePresetName>(
   Object.keys(POSE_PRESETS) as PosePresetName[],
@@ -1829,6 +1843,11 @@ export default function App() {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const viewportGizmoCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewerRef = useRef<SkinViewer | null>(null);
+  const rotationGizmoRef = useRef<TransformControls | null>(null);
+  const rotationGizmoBindingRef = useRef<RotationGizmoBinding | null>(null);
+  const rotationGizmoDraftPoseRef = useRef<PoseState | null>(null);
+  const isRotationGizmoDraggingRef = useRef(false);
+  const suppressViewportClickRef = useRef(false);
   const selectedOutlineRef = useRef<Group | null>(null);
   const outerLayerVoxelMeshesRef = useRef<OuterLayerVoxelMeshes>({});
   const sceneDebugCubeRef = useRef<Mesh | null>(null);
@@ -1837,6 +1856,9 @@ export default function App() {
   const activeDocumentIdRef = useRef(initialDocument.id);
   const nextPoseIndexRef = useRef(2);
   const exportPreviewRequestIdRef = useRef(0);
+  const poseRef = useRef(initialDocument.pose);
+  const avatarTypeRef = useRef(initialDocument.avatarType);
+  const selectedPoseSelectionRef = useRef(initialDocument.selectedPoseSelection);
 
   const [viewerReady, setViewerReady] = useState(false);
   const [documents, setDocuments] = useState<WorkspaceDocument[]>([initialDocument]);
@@ -1895,6 +1917,18 @@ export default function App() {
   useEffect(() => {
     documentsRef.current = documents;
   }, [documents]);
+
+  useEffect(() => {
+    poseRef.current = pose;
+  }, [pose]);
+
+  useEffect(() => {
+    avatarTypeRef.current = avatarType;
+  }, [avatarType]);
+
+  useEffect(() => {
+    selectedPoseSelectionRef.current = selectedPoseSelection;
+  }, [selectedPoseSelection]);
 
   useEffect(() => {
     activeDocumentIdRef.current = activeDocumentId;
@@ -2544,6 +2578,232 @@ export default function App() {
     return hasOutlineMesh ? selectedOutline : null;
   }
 
+  function clampPoseValue(poseKey: keyof PoseState, value: number): number {
+    const fieldConfig = POSE_FIELD_LIMITS.get(poseKey);
+    const roundedValue = Math.round(value);
+
+    if (!fieldConfig) {
+      return roundedValue;
+    }
+
+    return Math.min(fieldConfig.max, Math.max(fieldConfig.min, roundedValue));
+  }
+
+  function resolvePrimaryRotationObject(viewer: SkinViewer, boneId: PoseBoneId): Object3D {
+    switch (boneId) {
+      case "head":
+        return viewer.playerObject.skin.head;
+      case "torso":
+        return getViewerTorsoJointRoot(viewer);
+      case "leftArm":
+        return viewer.playerObject.skin.leftArm;
+      case "rightArm":
+        return viewer.playerObject.skin.rightArm;
+      case "leftLeg":
+        return viewer.playerObject.skin.leftLeg;
+      case "rightLeg":
+        return viewer.playerObject.skin.rightLeg;
+    }
+  }
+
+  function createRotationGizmoBinding(
+    viewer: SkinViewer,
+    selection: PoseSelection,
+  ): RotationGizmoBinding | null {
+    if (selection.kind === "joint") {
+      const advancedJointObject = getAdvancedAvatarJointObject(viewer, selection.id);
+
+      if (advancedJointObject) {
+        switch (selection.id) {
+          case "spineBend":
+            return {
+              object: advancedJointObject,
+              showX: true,
+              showY: false,
+              showZ: false,
+              updatePoseFromObject: (nextPose, object) => ({
+                ...nextPose,
+                spineBend: clampPoseValue("spineBend", -object.rotation.x * (180 / Math.PI)),
+              }),
+            };
+          case "leftElbowPitch":
+          case "rightElbowPitch":
+            return {
+              object: advancedJointObject,
+              showX: true,
+              showY: false,
+              showZ: false,
+              updatePoseFromObject: (nextPose, object) => ({
+                ...nextPose,
+                [selection.id]: clampPoseValue(selection.id, -object.rotation.x * (180 / Math.PI)),
+              }),
+            };
+          case "leftKneePitch":
+          case "rightKneePitch":
+            return {
+              object: advancedJointObject,
+              showX: true,
+              showY: false,
+              showZ: false,
+              updatePoseFromObject: (nextPose, object) => ({
+                ...nextPose,
+                [selection.id]: clampPoseValue(selection.id, object.rotation.x * (180 / Math.PI)),
+              }),
+            };
+        }
+      }
+
+      const primaryObject = resolvePrimaryRotationObject(viewer, resolveSelectedBoneId(selection));
+
+      switch (selection.id) {
+        case "headPitch":
+        case "leftArmPitch":
+        case "rightArmPitch":
+        case "leftLegPitch":
+        case "rightLegPitch":
+        case "bodyPitch":
+          return {
+            object: primaryObject,
+            showX: true,
+            showY: false,
+            showZ: false,
+            updatePoseFromObject: (nextPose, object) => ({
+              ...nextPose,
+              [selection.id]: clampPoseValue(selection.id, object.rotation.x * (180 / Math.PI)),
+            }),
+          };
+        case "headYaw":
+        case "leftArmYaw":
+        case "rightArmYaw":
+        case "leftLegYaw":
+        case "rightLegYaw":
+        case "bodyYaw":
+          return {
+            object: primaryObject,
+            showX: false,
+            showY: true,
+            showZ: false,
+            updatePoseFromObject: (nextPose, object) => ({
+              ...nextPose,
+              [selection.id]: clampPoseValue(selection.id, object.rotation.y * (180 / Math.PI)),
+            }),
+          };
+        case "leftArmRoll":
+        case "rightArmRoll":
+        case "leftLegRoll":
+        case "rightLegRoll":
+        case "bodyRoll":
+          return {
+            object: primaryObject,
+            showX: false,
+            showY: false,
+            showZ: true,
+            updatePoseFromObject: (nextPose, object) => ({
+              ...nextPose,
+              [selection.id]: clampPoseValue(selection.id, object.rotation.z * (180 / Math.PI)),
+            }),
+          };
+      }
+
+      return null;
+    }
+
+    switch (selection.id) {
+      case "head":
+        return {
+          object: viewer.playerObject.skin.head,
+          showX: true,
+          showY: true,
+          showZ: false,
+          updatePoseFromObject: (nextPose, object) => ({
+            ...nextPose,
+            headPitch: clampPoseValue("headPitch", object.rotation.x * (180 / Math.PI)),
+            headYaw: clampPoseValue("headYaw", object.rotation.y * (180 / Math.PI)),
+          }),
+        };
+      case "torso":
+        return {
+          object: getViewerTorsoJointRoot(viewer),
+          showX: true,
+          showY: true,
+          showZ: false,
+          updatePoseFromObject: (nextPose, object) => ({
+            ...nextPose,
+            bodyPitch: clampPoseValue("bodyPitch", object.rotation.x * (180 / Math.PI)),
+            bodyYaw: clampPoseValue("bodyYaw", object.rotation.y * (180 / Math.PI)),
+          }),
+        };
+      case "leftArm":
+      case "rightArm":
+      case "leftLeg":
+      case "rightLeg": {
+        const object = resolvePrimaryRotationObject(viewer, selection.id);
+        const axisPrefix = selection.id;
+
+        return {
+          object,
+          showX: true,
+          showY: true,
+          showZ: true,
+          updatePoseFromObject: (nextPose, targetObject) => ({
+            ...nextPose,
+            [`${axisPrefix}Pitch`]: clampPoseValue(
+              `${axisPrefix}Pitch` as keyof PoseState,
+              targetObject.rotation.x * (180 / Math.PI),
+            ),
+            [`${axisPrefix}Yaw`]: clampPoseValue(
+              `${axisPrefix}Yaw` as keyof PoseState,
+              targetObject.rotation.y * (180 / Math.PI),
+            ),
+            [`${axisPrefix}Roll`]: clampPoseValue(
+              `${axisPrefix}Roll` as keyof PoseState,
+              targetObject.rotation.z * (180 / Math.PI),
+            ),
+          }),
+        };
+      }
+    }
+  }
+
+  function syncRotationGizmo(): void {
+    const viewer = viewerRef.current;
+    const rotationGizmo = rotationGizmoRef.current;
+
+    if (!viewer || !rotationGizmo) {
+      rotationGizmoBindingRef.current = null;
+      return;
+    }
+
+    if (!skin || isLoading) {
+      rotationGizmo.detach();
+      rotationGizmo.visible = false;
+      rotationGizmoBindingRef.current = null;
+      return;
+    }
+
+    if (isRotationGizmoDraggingRef.current) {
+      return;
+    }
+
+    const nextBinding = createRotationGizmoBinding(viewer, selectedPoseSelection);
+
+    if (!nextBinding) {
+      rotationGizmo.detach();
+      rotationGizmo.visible = false;
+      rotationGizmoBindingRef.current = null;
+      return;
+    }
+
+    rotationGizmo.attach(nextBinding.object);
+    rotationGizmo.showX = nextBinding.showX;
+    rotationGizmo.showY = nextBinding.showY;
+    rotationGizmo.showZ = nextBinding.showZ;
+    rotationGizmo.visible = true;
+    rotationGizmoBindingRef.current = nextBinding;
+    viewer.render();
+    publishDebugState(viewer);
+  }
+
   function syncSelectedOutline(): void {
     const viewer = viewerRef.current;
 
@@ -2898,6 +3158,7 @@ export default function App() {
     });
 
     let viewportGizmo: ViewportGizmo | null = createViewportGizmo(gizmoCanvas);
+    const rotationGizmo = new TransformControls(viewer.camera, canvas);
     const renderViewer = viewer.render.bind(viewer);
 
     viewer.render = () => {
@@ -2906,6 +3167,7 @@ export default function App() {
     };
 
     viewerRef.current = viewer;
+    rotationGizmoRef.current = rotationGizmo;
     attachDebugHelpers();
     applyViewportLighting(viewer, viewportLightingMode);
     viewer.controls.enablePan = false;
@@ -2920,6 +3182,67 @@ export default function App() {
     applyPose(viewer, pose);
     applyOuterLayerPresentation(viewer, showOuterLayer, showOuterLayerIn3d);
     syncSelectedOutline();
+    rotationGizmo.setMode("rotate");
+    rotationGizmo.setSpace("local");
+    rotationGizmo.size = 0.9;
+    rotationGizmo.visible = false;
+    viewer.scene.add(rotationGizmo);
+    rotationGizmo.addEventListener("mouseDown", () => {
+      suppressViewportClickRef.current = true;
+    });
+    rotationGizmo.addEventListener("dragging-changed", (event) => {
+      const isDragging = Boolean((event as { value?: boolean }).value);
+
+      isRotationGizmoDraggingRef.current = isDragging;
+      viewer.controls.enabled = !isDragging;
+
+      if (isDragging) {
+        rotationGizmoDraftPoseRef.current = clonePose(poseRef.current);
+        return;
+      }
+
+      const binding = rotationGizmoBindingRef.current;
+      const draftPose = rotationGizmoDraftPoseRef.current;
+
+      rotationGizmoDraftPoseRef.current = null;
+
+      if (!binding || !draftPose) {
+        syncSelectedOutline();
+        viewer.render();
+        publishDebugState(viewer);
+        return;
+      }
+
+      const committedPose = binding.updatePoseFromObject(draftPose, binding.object);
+
+      updateDocument(activeDocumentIdRef.current, (currentDocument) => ({
+        ...currentDocument,
+        selectedPreset: null,
+        pose: committedPose,
+      }));
+    });
+    rotationGizmo.addEventListener("objectChange", () => {
+      if (!isRotationGizmoDraggingRef.current) {
+        return;
+      }
+
+      const binding = rotationGizmoBindingRef.current;
+
+      if (!binding) {
+        return;
+      }
+
+      const nextDraftPose = binding.updatePoseFromObject(
+        rotationGizmoDraftPoseRef.current ?? poseRef.current,
+        binding.object,
+      );
+
+      rotationGizmoDraftPoseRef.current = nextDraftPose;
+      syncSelectedOutline();
+      viewer.render();
+      publishDebugState(viewer);
+    });
+    syncRotationGizmo();
     viewer.render();
     publishDebugState(viewer);
 
@@ -2955,6 +3278,11 @@ export default function App() {
     };
 
     const handleViewportClick = (event: MouseEvent) => {
+      if (suppressViewportClickRef.current) {
+        suppressViewportClickRef.current = false;
+        return;
+      }
+
       const rect = canvas.getBoundingClientRect();
 
       if (rect.width === 0 || rect.height === 0) {
@@ -3024,10 +3352,17 @@ export default function App() {
       canvas.removeEventListener("click", handleViewportClick);
       gizmoCanvas.removeEventListener("click", handleViewportGizmoClick);
       disposeSelectedOutline();
+      rotationGizmo.detach();
+      rotationGizmo.removeFromParent();
+      rotationGizmo.dispose();
+      rotationGizmoDraftPoseRef.current = null;
       disposeOuterLayerVoxelMeshes();
       disposeViewerViewportMaterialVariants(viewer);
       viewportGizmo?.dispose();
       viewportGizmo = null;
+      rotationGizmoRef.current = null;
+      rotationGizmoBindingRef.current = null;
+      isRotationGizmoDraggingRef.current = false;
       sceneDebugCubeRef.current?.removeFromParent();
       sceneDebugCubeRef.current = null;
       sceneDebugVoxelCloneRef.current?.removeFromParent();
@@ -3061,12 +3396,14 @@ export default function App() {
 
     applyPose(viewer, pose);
     syncSelectedOutline();
+    syncRotationGizmo();
     viewer.render();
     publishDebugState(viewer);
   }, [avatarType, pose]);
 
   useEffect(() => {
     syncSelectedOutline();
+    syncRotationGizmo();
   }, [selectedPoseSelection, skin]);
 
   useEffect(() => {
@@ -3079,6 +3416,7 @@ export default function App() {
     applyOuterLayerPresentation(viewer, showOuterLayer, showOuterLayerIn3d);
     applyViewportLighting(viewer, viewportLightingMode);
     syncSelectedOutline();
+    syncRotationGizmo();
     viewer.render();
     publishDebugState(viewer);
   }, [showOuterLayer, showOuterLayerIn3d, resolvedModel, viewportLightingMode]);
@@ -3146,6 +3484,7 @@ export default function App() {
         centerViewerOnCharacter(viewer);
         applyPose(viewer, pose);
         syncSelectedOutline();
+        syncRotationGizmo();
         viewer.render();
         publishDebugState(viewer);
 
@@ -3191,6 +3530,7 @@ export default function App() {
     applyPose(viewer, pose);
     applyOuterLayerPresentation(viewer, showOuterLayer, showOuterLayerIn3d);
     syncSelectedOutline();
+    syncRotationGizmo();
     viewer.render();
     publishDebugState(viewer);
   }, [avatarType, pose, showOuterLayer, showOuterLayerIn3d, skin]);
@@ -3626,6 +3966,7 @@ export default function App() {
     const viewer = viewerRef.current;
     const stage = stageRef.current;
     const selectedOutline = selectedOutlineRef.current;
+    const rotationGizmo = rotationGizmoRef.current;
 
     if (!viewer || !skin) {
       throw new Error("Load a skin before exporting.");
@@ -3636,9 +3977,14 @@ export default function App() {
     }
 
     const previousSelectedOutlineVisibility = selectedOutline?.visible ?? false;
+    const previousRotationGizmoVisibility = rotationGizmo?.visible ?? false;
 
     if (selectedOutline) {
       selectedOutline.visible = false;
+    }
+
+    if (rotationGizmo) {
+      rotationGizmo.visible = false;
     }
 
     viewer.render();
@@ -3722,6 +4068,10 @@ export default function App() {
 
       if (selectedOutline) {
         selectedOutline.visible = previousSelectedOutlineVisibility;
+      }
+
+      if (rotationGizmo) {
+        rotationGizmo.visible = previousRotationGizmoVisibility;
       }
 
       viewer.render();
