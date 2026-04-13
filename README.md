@@ -1,25 +1,38 @@
 # MC Poser
 
-MC Poser is a browser-based editor for posing Minecraft skins in 3D. You can load a skin from a username or PNG, adjust the model with per-joint controls, export polished renders, and share either the scene or the final image with a compact link.
+MC Poser is a browser-based editor for posing Minecraft skins in 3D. Load a skin from a username or PNG, pose it with direct joint controls and viewport gizmos, then export a polished render or share the full scene with a compact link.
 
-## What it does
+![MC Poser preview](src/img/pockydev-pose.png)
 
-- Loads Minecraft skins from Mojang profile lookups or local PNG files.
-- Supports classic, slim, and auto-detect arm models.
-- Provides a live 3D viewport with orbit controls, lighting modes, and a camera gizmo.
-- Lets you pose the head, torso, arms, and legs with direct controls and presets.
-- Exports images with configurable size, format, and background settings.
-- Generates shareable links for projects and rendered outputs.
+[Live app](https://mcposer.pcky.dev) · [Support on Ko-Fi](https://ko-fi.com/pockydev) · [Report an issue](https://github.com/PckyDev/MC-Poser/issues)
 
-## Built with
+## Highlights
 
-- React
-- TypeScript
-- Vite
+- Load skins from Mojang username lookups or local PNG files.
+- Pose characters with sliders, presets, and in-viewport rotation gizmos.
+- Switch between default, bobblehead, and advanced avatar rigs.
+- Bend the lower torso, spine, elbows, and knees with per-joint controls.
+- Support classic, slim, and auto-detect arm models.
+- Toggle the outer layer, including voxel-style 3D outer layer rendering.
+- Export PNG, JPG, or WebP renders with custom resolution and background settings.
+- Generate compact share links for full projects and rendered image outputs.
+
+## Workflow
+
+1. Load a skin from a Minecraft username or a PNG file.
+2. Choose an avatar type and arm model.
+3. Pose the character in the viewport or inspector.
+4. Export a render or share the scene with a link.
+
+## Built With
+
+- React 19
+- TypeScript 6
+- Vite 8
 - skinview3d
 - Cloudflare Pages Functions
 
-## Getting started
+## Getting Started
 
 ### Requirements
 
@@ -52,27 +65,10 @@ npm run build
 npm run preview
 ```
 
-`npm run preview` serves the built client only. If you want to test the Cloudflare Pages Function locally after a build, run:
+`npm run preview` serves the static client only and does not include the `/api/skin` lookup route.
 
-```bash
-npx wrangler pages dev dist
-```
+## Support
 
-## Deploying to Cloudflare Pages
-
-This repository is already structured for Cloudflare Pages and includes the Pages Function used for `/api/skin`.
-
-Use these settings when creating the Pages project:
-
-- Build command: `npm run build`
-- Build output directory: `dist`
-- Node version: `22`
-- Root directory: `/`
-
-The existing [wrangler.toml](wrangler.toml) file matches that setup.
-
-## Project notes
-
-- Username lookups are handled through Mojang profile APIs
-- Shared project and image links are encoded in the URL hash.
-- The client app builds to static assets in `dist`, while the API route is provided through `functions/api/skin.ts`.
+- Support development on Ko-Fi: https://ko-fi.com/pockydev
+- Suggest ideas or report bugs through the in-app `Help` menu.
+- GitHub issues: https://github.com/PckyDev/MC-Poser/issues
