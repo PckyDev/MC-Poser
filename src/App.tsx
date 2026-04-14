@@ -4351,6 +4351,24 @@ export default function App() {
     publishDebugState(viewer);
   }, [showHeldItems, skin]);
 
+  async function parseSkinLookupResponse(
+    response: Response,
+  ): Promise<(SkinLookupResult & { error?: string }) | null> {
+    const responseType = response.headers.get("content-type")?.toLowerCase() ?? "";
+
+    if (!responseType.includes("application/json")) {
+      return null;
+    }
+
+    try {
+      return (await response.json()) as SkinLookupResult & {
+        error?: string;
+      };
+    } catch {
+      return null;
+    }
+  }
+
   async function loadUsername(nextUsername: string, targetDocumentId = activeDocumentId): Promise<void> {
     const trimmedUsername = nextUsername.trim();
 
@@ -4368,12 +4386,19 @@ export default function App() {
       const response = await fetch(
         `/api/skin?username=${encodeURIComponent(trimmedUsername)}`,
       );
-      const payload = (await response.json()) as SkinLookupResult & {
-        error?: string;
-      };
+      const payload = await parseSkinLookupResponse(response);
 
       if (!response.ok) {
-        throw new Error(payload.error ?? "Unable to resolve that username.");
+        throw new Error(
+          payload?.error ??
+            (response.status >= 500
+              ? "Skin lookup service is unavailable right now."
+              : "Unable to resolve that username."),
+        );
+      }
+
+      if (!payload) {
+        throw new Error("Skin lookup returned an invalid response.");
       }
 
       updateDocument(targetDocumentId, (currentDocument) => {
