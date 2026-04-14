@@ -280,6 +280,23 @@ type ShareHashPayload = {
 
 type ViewportLightingMode = "lit" | "unlit";
 
+type FallbackProfileApiResponse = {
+  code?: string;
+  data?: {
+    player?: {
+      id?: string;
+      properties?: Array<{
+        name?: string;
+        value?: string;
+      }>;
+      raw_id?: string;
+      skin_texture?: string;
+      username?: string;
+    };
+  };
+  message?: string;
+};
+
 type ViewportGizmoViewId = "right" | "left" | "top" | "bottom" | "front" | "back";
 
 type ViewportGizmo = {
@@ -4369,6 +4386,106 @@ export default function App() {
     }
   }
 
+  function decodeFallbackTexturePayload(value: string): {
+    textures?: {
+      SKIN?: {
+        metadata?: {
+          model?: string;
+        };
+      };
+    };
+  } | null {
+    try {
+      return JSON.parse(atob(value)) as {
+        textures?: {
+          SKIN?: {
+            metadata?: {
+              model?: string;
+            };
+          };
+        };
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  async function loadSkinFromFallbackApi(username: string): Promise<SkinLookupResult> {
+    const response = await fetch(
+      `https://playerdb.co/api/player/minecraft/${encodeURIComponent(username)}`,
+    );
+    const payload = (await response.json()) as FallbackProfileApiResponse;
+
+    if (!response.ok) {
+      throw new Error(payload.message?.trim() || "Unable to resolve that username.");
+    }
+
+    const player = payload.data?.player;
+    const textureProperty = player?.properties?.find(
+      (property) => property.name === "textures" && typeof property.value === "string",
+    );
+    const texturePayload = textureProperty?.value
+      ? decodeFallbackTexturePayload(textureProperty.value)
+      : null;
+    const textureUrl = typeof player?.skin_texture === "string"
+      ? player.skin_texture.trim()
+      : "";
+    const resolvedUsername = typeof player?.username === "string"
+      ? player.username.trim()
+      : "";
+    const resolvedUuid = typeof player?.raw_id === "string" && player.raw_id.trim()
+      ? player.raw_id.trim()
+      : typeof player?.id === "string"
+        ? player.id.replace(/-/g, "").trim()
+        : "";
+
+    if (!resolvedUsername || !resolvedUuid || !textureUrl) {
+      throw new Error("Skin lookup returned an invalid response.");
+    }
+
+    return {
+      username: resolvedUsername,
+      uuid: resolvedUuid,
+      textureUrl,
+      model:
+        texturePayload?.textures?.SKIN?.metadata?.model === "slim"
+          ? "slim"
+          : "default",
+    };
+  }
+
+  async function resolveSkinLookup(username: string): Promise<SkinLookupResult> {
+    try {
+      const response = await fetch(
+        `/api/skin?username=${encodeURIComponent(username)}`,
+      );
+      const payload = await parseSkinLookupResponse(response);
+
+      if (!response.ok) {
+        if (response.status < 500) {
+          throw new Error(payload?.error ?? "Unable to resolve that username.");
+        }
+
+        return await loadSkinFromFallbackApi(username);
+      }
+
+      if (!payload) {
+        return await loadSkinFromFallbackApi(username);
+      }
+
+      return payload;
+    } catch (lookupError) {
+      if (
+        lookupError instanceof Error &&
+        /username|not exist|not found|invalid/i.test(lookupError.message)
+      ) {
+        throw lookupError;
+      }
+
+      return await loadSkinFromFallbackApi(username);
+    }
+  }
+
   async function loadUsername(nextUsername: string, targetDocumentId = activeDocumentId): Promise<void> {
     const trimmedUsername = nextUsername.trim();
 
@@ -4383,23 +4500,7 @@ export default function App() {
     setStatus(`Resolving ${trimmedUsername} from Mojang...`);
 
     try {
-      const response = await fetch(
-        `/api/skin?username=${encodeURIComponent(trimmedUsername)}`,
-      );
-      const payload = await parseSkinLookupResponse(response);
-
-      if (!response.ok) {
-        throw new Error(
-          payload?.error ??
-            (response.status >= 500
-              ? "Skin lookup service is unavailable right now."
-              : "Unable to resolve that username."),
-        );
-      }
-
-      if (!payload) {
-        throw new Error("Skin lookup returned an invalid response.");
-      }
+      const payload = await resolveSkinLookup(trimmedUsername);
 
       updateDocument(targetDocumentId, (currentDocument) => {
         const currentSkin = currentDocument.skin;
