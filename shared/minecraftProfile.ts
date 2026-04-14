@@ -30,16 +30,52 @@ type TexturePayload = {
   };
 };
 
+const BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
 function decodeBase64(value: string): string {
-  if (typeof atob === "function") {
-    return atob(value);
+  const sanitizedValue = value.replace(/\s+/g, "");
+
+  if (!sanitizedValue || sanitizedValue.length % 4 === 1) {
+    throw new Error("The Minecraft texture payload was invalid.");
   }
 
-  if (typeof Buffer !== "undefined") {
-    return Buffer.from(value, "base64").toString("utf-8");
+  const decodedBytes: number[] = [];
+
+  for (let index = 0; index < sanitizedValue.length; index += 4) {
+    const chunk = sanitizedValue.slice(index, index + 4);
+    const paddingLength = chunk.endsWith("==") ? 2 : chunk.endsWith("=") ? 1 : 0;
+    const chunkValues = Array.from(chunk, (character) => {
+      if (character === "=") {
+        return 0;
+      }
+
+      const characterIndex = BASE64_ALPHABET.indexOf(character);
+
+      if (characterIndex === -1) {
+        throw new Error("The Minecraft texture payload was invalid.");
+      }
+
+      return characterIndex;
+    });
+    const [first, second, third, fourth] = chunkValues;
+    const combinedValue =
+      ((first ?? 0) << 18) |
+      ((second ?? 0) << 12) |
+      ((third ?? 0) << 6) |
+      (fourth ?? 0);
+
+    decodedBytes.push((combinedValue >> 16) & 0xff);
+
+    if (paddingLength < 2) {
+      decodedBytes.push((combinedValue >> 8) & 0xff);
+    }
+
+    if (paddingLength < 1) {
+      decodedBytes.push(combinedValue & 0xff);
+    }
   }
 
-  throw new Error("No base64 decoder is available in this runtime.");
+  return new TextDecoder().decode(new Uint8Array(decodedBytes));
 }
 
 function normalizeTextureUrl(value: string): string {
