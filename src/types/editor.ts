@@ -1,6 +1,25 @@
 export type ModelPreference = "default" | "slim" | "auto-detect";
 export type ArmModel = "default" | "slim";
 export type AvatarType = "default" | "bobblehead" | "advanced";
+export type HeldItemArmId = "leftArm" | "rightArm";
+export type HeldItemPresetId =
+  | "apple"
+  | "book"
+  | "diamond"
+  | "diamondPickaxe"
+  | "diamondSword";
+export type HeldItemSourceKind = "preset" | "upload";
+
+export type HeldItemAdjustments = {
+  offsetX: number;
+  offsetY: number;
+  offsetZ: number;
+  rotationX: number;
+  rotationY: number;
+  rotationZ: number;
+  scale: number;
+  thickness: number;
+};
 
 export type PoseState = {
   headPitch: number;
@@ -32,7 +51,22 @@ export type PoseBoneId = "head" | "torso" | "leftArm" | "rightArm" | "leftLeg" |
 
 export type PoseSelection =
   | { kind: "bone"; id: PoseBoneId }
-  | { kind: "joint"; id: keyof PoseState };
+  | { kind: "joint"; id: keyof PoseState }
+  | { kind: "heldItem"; id: HeldItemArmId };
+
+export type HeldItem = {
+  adjustments: HeldItemAdjustments;
+  detail: string;
+  label: string;
+  presetId: HeldItemPresetId | null;
+  source: string;
+  sourceKind: HeldItemSourceKind;
+};
+
+export type HeldItemsState = {
+  leftArm: HeldItem | null;
+  rightArm: HeldItem | null;
+};
 
 export type LoadedSkin = {
   source: string;

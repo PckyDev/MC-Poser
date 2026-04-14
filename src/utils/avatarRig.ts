@@ -13,7 +13,7 @@ import {
   Vector3,
 } from "three";
 
-import type { ArmModel, PoseBoneId, PoseState } from "../types/editor";
+import type { ArmModel, HeldItemArmId, PoseBoneId, PoseState } from "../types/editor";
 
 const ADVANCED_RIG_STATE_KEY = "__mcPoserAdvancedRig";
 const SEGMENT_HEIGHT = 6;
@@ -1154,6 +1154,19 @@ export function getAdvancedAvatarJointObject(
     default:
       return null;
   }
+}
+
+export function getAdvancedAvatarHandAnchor(
+  viewer: SkinViewer,
+  armId: HeldItemArmId,
+): Object3D | null {
+  const state = getStoredAdvancedRig(viewer);
+
+  if (!state || !state.torsoRig.root.visible) {
+    return null;
+  }
+
+  return armId === "leftArm" ? state.leftArmRig.joint : state.rightArmRig.joint;
 }
 
 export function syncAdvancedAvatarRig(viewer: SkinViewer, isAdvanced: boolean): void {

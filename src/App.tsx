@@ -43,6 +43,7 @@ import {
   HelpContactModal,
   type HelpContactModalKind,
 } from "./components/editor/HelpContactModal";
+import { HeldItemModal } from "./components/editor/HeldItemModal";
 import { LeftSidebar } from "./components/editor/LeftSidebar";
 import { NewFileModal } from "./components/editor/NewFileModal";
 import { RightSidebar } from "./components/editor/RightSidebar";
@@ -62,6 +63,11 @@ import {
 import type {
   ArmModel,
   AvatarType,
+  HeldItemAdjustments,
+  HeldItem,
+  HeldItemArmId,
+  HeldItemPresetId,
+  HeldItemsState,
   LoadedSkin,
   ModelPreference,
   PoseBoneId,
@@ -86,20 +92,39 @@ import {
 } from "./utils/editor";
 import {
   getAdvancedAvatarJointObject,
+  getAdvancedAvatarHandAnchor,
   getAdvancedAvatarOutlineObjects,
   isAdvancedAvatarActive,
   setAdvancedAvatarOuterLayerVisibility,
 } from "./utils/avatarRig";
+import {
+  HELD_ITEM_ARM_IDS,
+  EMPTY_HELD_ITEMS,
+  areHeldItemAdjustmentsDefault,
+  buildPresetHeldItem,
+  canRevokeHeldItemSource,
+  cloneHeldItemAdjustments,
+  cloneHeldItems,
+  createHeldItemVoxelGeometry,
+  createDefaultHeldItemAdjustments,
+  createUploadedHeldItem,
+  formatHeldItemArmLabel,
+  isHeldItemArmId,
+  isHeldItemPresetId,
+  isHeldItemSourceKind,
+} from "./utils/heldItems";
 
 type WorkspaceDocument = {
   id: string;
   poseFileName: string;
   fileHandle: WorkspaceFileHandle | null;
+  heldItems: HeldItemsState;
   pose: PoseState;
   selectedPoseSelection: PoseSelection;
   selectedPreset: PosePresetName | null;
   showOuterLayer: boolean;
   showOuterLayerIn3d: boolean;
+  showHeldItems: boolean;
   skin: LoadedSkin | null;
   avatarType: AvatarType;
   resolvedModel: ArmModel | null;
@@ -110,25 +135,29 @@ type ImportedWorkspaceFile = {
   version?: unknown;
   poseFileName?: unknown;
   pose?: unknown;
+  heldItems?: unknown;
   skin?: unknown;
   selectedPoseSelection?: unknown;
   selectedPreset?: unknown;
   showOuterLayer?: unknown;
   showOuterLayerIn3d?: unknown;
+  showHeldItems?: unknown;
   avatarType?: unknown;
   resolvedModel?: unknown;
   uploadModel?: unknown;
 };
 
 type SerializableWorkspaceFile = {
-  version: 1;
+  version: 2;
   poseFileName: string;
   pose: PoseState;
+  heldItems: HeldItemsState;
   skin: LoadedSkin | null;
   selectedPoseSelection: PoseSelection;
   selectedPreset: PosePresetName | null;
   showOuterLayer: boolean;
   showOuterLayerIn3d: boolean;
+  showHeldItems: boolean;
   resolvedModel: ArmModel | null;
   avatarType: AvatarType;
   uploadModel: ModelPreference;
@@ -151,12 +180,22 @@ const SHARE_FILE_TYPES: readonly ExportFileType[] = ["png", "jpg", "webp"];
 const SHARE_MODEL_PREFERENCES: readonly ModelPreference[] = ["default", "slim", "auto-detect"];
 const SHARE_ARM_MODELS: readonly ArmModel[] = ["default", "slim"];
 const SHARE_AVATAR_TYPES: readonly AvatarType[] = ["default", "bobblehead", "advanced"];
+const HELD_ITEM_ADJUSTMENT_KEYS = [
+  "offsetX",
+  "offsetY",
+  "offsetZ",
+  "rotationX",
+  "rotationY",
+  "rotationZ",
+  "scale",
+  "thickness",
+] as const satisfies readonly (keyof HeldItemAdjustments)[];
 const PRIMARY_SITE_ORIGIN = "https://mcposer.pcky.dev";
 const DEFAULT_SEO_TITLE = "MC Poser | Pose Minecraft skins in 3D";
 const DEFAULT_SEO_DESCRIPTION =
   "Browser-based Minecraft skin pose editor with 3D controls, image export, and compact share links.";
 
-type SharedSelectionPayload = readonly [0 | 1, number];
+type SharedSelectionPayload = readonly [0 | 1 | 2, number];
 
 type SharedSkinPayload = readonly [
   string,
@@ -166,19 +205,59 @@ type SharedSkinPayload = readonly [
   0 | 1 | 2,
 ];
 
-type SharedProjectPayload = readonly [
-  1,
-  string,
-  number[],
-  SharedSelectionPayload,
+type SharedHeldItemAdjustmentsPayload = readonly [
   number,
-  0 | 1,
-  0 | 1,
-  SharedSkinPayload | null,
-  -1 | 0 | 1,
-  0 | 1 | 2,
-  0 | 1 | 2,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
 ];
+
+type SharedHeldItemPayload = readonly [
+  string,
+  0 | 1,
+  string,
+  string,
+  SharedHeldItemAdjustmentsPayload?,
+];
+
+type SharedHeldItemsPayload = readonly [
+  SharedHeldItemPayload | null,
+  SharedHeldItemPayload | null,
+];
+
+type SharedProjectPayload =
+  | readonly [
+      1,
+      string,
+      number[],
+      SharedSelectionPayload,
+      number,
+      0 | 1,
+      0 | 1,
+      SharedSkinPayload | null,
+      -1 | 0 | 1,
+      0 | 1 | 2,
+      0 | 1 | 2,
+    ]
+  | readonly [
+      2,
+      string,
+      number[],
+      SharedSelectionPayload,
+      number,
+      0 | 1,
+      0 | 1,
+      SharedSkinPayload | null,
+      -1 | 0 | 1,
+      0 | 1 | 2,
+      0 | 1 | 2,
+      SharedHeldItemsPayload,
+      (0 | 1)?,
+    ];
 
 type SharedExportSettingsPayload = readonly [
   number,
@@ -234,6 +313,7 @@ type TexturePixelSample = {
 type MeshMaterial = Mesh["material"];
 
 type OuterLayerVoxelMeshes = Partial<Record<PoseBoneId, Mesh>>;
+type HeldItemMeshes = Partial<Record<HeldItemArmId, Group>>;
 
 type ViewportMaterialVariants = {
   lit: MeshMaterial;
@@ -286,6 +366,7 @@ type DebugWindow = Window & {
     } | null;
     showOuterLayer: boolean;
     showOuterLayerIn3d: boolean;
+    showHeldItems: boolean;
     voxelMeshes: Partial<Record<
       PoseBoneId,
       {
@@ -873,6 +954,89 @@ function isPoseKey(value: unknown): value is keyof PoseState {
   return typeof value === "string" && POSE_KEYS.includes(value as keyof PoseState);
 }
 
+function normalizeImportedHeldItemAdjustments(rawAdjustments: unknown): HeldItemAdjustments {
+  const nextAdjustments = createDefaultHeldItemAdjustments();
+
+  if (!isObjectRecord(rawAdjustments)) {
+    return nextAdjustments;
+  }
+
+  for (const adjustmentKey of HELD_ITEM_ADJUSTMENT_KEYS) {
+    const rawValue = rawAdjustments[adjustmentKey];
+
+    if (typeof rawValue === "number" && Number.isFinite(rawValue)) {
+      nextAdjustments[adjustmentKey] = rawValue;
+    }
+  }
+
+  return nextAdjustments;
+}
+
+function normalizeImportedHeldItem(rawHeldItem: unknown): HeldItem | null {
+  if (!isObjectRecord(rawHeldItem)) {
+    return null;
+  }
+
+  const presetId = isHeldItemPresetId(rawHeldItem.presetId)
+    ? rawHeldItem.presetId
+    : null;
+
+  if (presetId) {
+    const presetItem = buildPresetHeldItem(presetId);
+
+    return {
+      ...presetItem,
+      adjustments: normalizeImportedHeldItemAdjustments(rawHeldItem.adjustments),
+      detail:
+        typeof rawHeldItem.detail === "string" && rawHeldItem.detail.trim()
+          ? rawHeldItem.detail.trim()
+          : presetItem.detail,
+      label:
+        typeof rawHeldItem.label === "string" && rawHeldItem.label.trim()
+          ? rawHeldItem.label.trim()
+          : presetItem.label,
+      source:
+        typeof rawHeldItem.source === "string" && rawHeldItem.source.trim()
+          ? rawHeldItem.source.trim()
+          : presetItem.source,
+    };
+  }
+
+  const source = typeof rawHeldItem.source === "string" ? rawHeldItem.source.trim() : "";
+
+  if (!source) {
+    return null;
+  }
+
+  return {
+    adjustments: normalizeImportedHeldItemAdjustments(rawHeldItem.adjustments),
+    detail:
+      typeof rawHeldItem.detail === "string" && rawHeldItem.detail.trim()
+        ? rawHeldItem.detail.trim()
+        : "Imported held item",
+    label:
+      typeof rawHeldItem.label === "string" && rawHeldItem.label.trim()
+        ? rawHeldItem.label.trim()
+        : "Imported item",
+    presetId: null,
+    source,
+    sourceKind: isHeldItemSourceKind(rawHeldItem.sourceKind)
+      ? rawHeldItem.sourceKind
+      : "upload",
+  };
+}
+
+function normalizeImportedHeldItems(rawHeldItems: unknown): HeldItemsState {
+  if (!isObjectRecord(rawHeldItems)) {
+    return cloneHeldItems();
+  }
+
+  return {
+    leftArm: normalizeImportedHeldItem(rawHeldItems.leftArm),
+    rightArm: normalizeImportedHeldItem(rawHeldItems.rightArm),
+  };
+}
+
 function normalizeImportedPose(rawPose: unknown): PoseState {
   const nextPose = clonePose(NEUTRAL_POSE);
 
@@ -906,6 +1070,13 @@ function normalizeImportedSelection(rawSelection: unknown): PoseSelection {
   if (rawSelection.kind === "joint" && isPoseKey(rawSelection.id)) {
     return {
       kind: "joint",
+      id: rawSelection.id,
+    };
+  }
+
+  if (rawSelection.kind === "heldItem" && isHeldItemArmId(rawSelection.id)) {
+    return {
+      kind: "heldItem",
       id: rawSelection.id,
     };
   }
@@ -949,6 +1120,42 @@ function normalizeImportedSkin(
     modelPreference: isModelPreference(rawSkin.modelPreference)
       ? rawSkin.modelPreference
       : fallbackModel,
+  };
+}
+
+async function serializeWorkspaceHeldItem(item: HeldItem | null): Promise<HeldItem | null> {
+  if (!item) {
+    return null;
+  }
+
+  const serializedAdjustments = cloneHeldItemAdjustments(item.adjustments);
+
+  if (item.sourceKind !== "upload" || item.source.startsWith("data:")) {
+    return {
+      ...item,
+      adjustments: serializedAdjustments,
+    };
+  }
+
+  const response = await fetch(item.source);
+
+  if (!response.ok) {
+    throw new Error("Unable to package an uploaded held item for saving.");
+  }
+
+  const dataUrl = await blobToDataUrl(await response.blob());
+
+  return {
+    ...item,
+    adjustments: serializedAdjustments,
+    source: dataUrl,
+  };
+}
+
+async function serializeWorkspaceHeldItems(heldItems: HeldItemsState): Promise<HeldItemsState> {
+  return {
+    leftArm: await serializeWorkspaceHeldItem(heldItems.leftArm),
+    rightArm: await serializeWorkspaceHeldItem(heldItems.rightArm),
   };
 }
 
@@ -1337,11 +1544,25 @@ function avatarTypeFromShareCode(value: unknown): AvatarType {
     : "default";
 }
 
+function heldItemSourceKindToShareCode(value: HeldItem["sourceKind"]): 0 | 1 {
+  return value === "preset" ? 0 : 1;
+}
+
+function heldItemSourceKindFromShareCode(value: unknown): HeldItem["sourceKind"] {
+  return value === 0 ? "preset" : "upload";
+}
+
 function encodeShareSelection(selection: PoseSelection): SharedSelectionPayload {
   if (selection.kind === "bone") {
     const boneIndex = POSE_BONES.findIndex((bone) => bone.id === selection.id);
 
     return [0, boneIndex === -1 ? 0 : boneIndex];
+  }
+
+  if (selection.kind === "heldItem") {
+    const armIndex = HELD_ITEM_ARM_IDS.indexOf(selection.id);
+
+    return [2, armIndex === -1 ? 0 : armIndex];
   }
 
   const poseIndex = POSE_KEYS.indexOf(selection.id);
@@ -1370,6 +1591,14 @@ function decodeShareSelection(payload: unknown): PoseSelection {
 
     if (poseKey) {
       return { kind: "joint", id: poseKey };
+    }
+  }
+
+  if (selectionKind === 2) {
+    const armId = HELD_ITEM_ARM_IDS[selectionIndex];
+
+    if (armId) {
+      return { kind: "heldItem", id: armId };
     }
   }
 
@@ -1432,11 +1661,156 @@ function decodeShareSkin(
   };
 }
 
+function encodeShareHeldItemAdjustments(
+  adjustments: HeldItemAdjustments,
+): SharedHeldItemAdjustmentsPayload | undefined {
+  const normalizedAdjustments = cloneHeldItemAdjustments(adjustments);
+
+  if (areHeldItemAdjustmentsDefault(normalizedAdjustments)) {
+    return undefined;
+  }
+
+  return [
+    normalizedAdjustments.offsetX,
+    normalizedAdjustments.offsetY,
+    normalizedAdjustments.offsetZ,
+    normalizedAdjustments.rotationX,
+    normalizedAdjustments.rotationY,
+    normalizedAdjustments.rotationZ,
+    normalizedAdjustments.scale,
+    normalizedAdjustments.thickness,
+  ];
+}
+
+function decodeShareHeldItemAdjustments(payload: unknown): HeldItemAdjustments {
+  if (!Array.isArray(payload)) {
+    return createDefaultHeldItemAdjustments();
+  }
+
+  const nextAdjustments: Partial<HeldItemAdjustments> = {};
+
+  HELD_ITEM_ADJUSTMENT_KEYS.forEach((adjustmentKey, index) => {
+    const value = payload[index];
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+      nextAdjustments[adjustmentKey] = value;
+    }
+  });
+
+  return cloneHeldItemAdjustments(nextAdjustments);
+}
+
+function encodeShareHeldItem(item: HeldItem | null): SharedHeldItemPayload | null {
+  if (!item) {
+    return null;
+  }
+
+  const encodedAdjustments = encodeShareHeldItemAdjustments(item.adjustments);
+
+  return encodedAdjustments
+    ? [
+        item.label,
+        heldItemSourceKindToShareCode(item.sourceKind),
+        item.detail,
+        item.sourceKind === "preset" && item.presetId ? item.presetId : item.source,
+        encodedAdjustments,
+      ]
+    : [
+        item.label,
+        heldItemSourceKindToShareCode(item.sourceKind),
+        item.detail,
+        item.sourceKind === "preset" && item.presetId ? item.presetId : item.source,
+      ];
+}
+
+function decodeShareHeldItem(payload: unknown): HeldItem | null {
+  if (!Array.isArray(payload) || typeof payload[3] !== "string") {
+    return null;
+  }
+
+  const sourceKind = heldItemSourceKindFromShareCode(payload[1]);
+  const payloadValue = payload[3].trim();
+
+  if (!payloadValue) {
+    return null;
+  }
+
+  if (sourceKind === "preset" && isHeldItemPresetId(payloadValue)) {
+    const presetItem = buildPresetHeldItem(payloadValue);
+
+    return {
+      ...presetItem,
+      adjustments: decodeShareHeldItemAdjustments(payload[4]),
+      detail:
+        typeof payload[2] === "string" && payload[2].trim()
+          ? payload[2].trim()
+          : presetItem.detail,
+      label:
+        typeof payload[0] === "string" && payload[0].trim()
+          ? payload[0].trim()
+          : presetItem.label,
+    };
+  }
+
+  return {
+    adjustments: decodeShareHeldItemAdjustments(payload[4]),
+    detail:
+      typeof payload[2] === "string" && payload[2].trim()
+        ? payload[2].trim()
+        : "Shared held item",
+    label:
+      typeof payload[0] === "string" && payload[0].trim()
+        ? payload[0].trim()
+        : "Shared item",
+    presetId: null,
+    source: payloadValue,
+    sourceKind: sourceKind === "preset" ? "upload" : sourceKind,
+  };
+}
+
+function encodeShareHeldItems(heldItems: HeldItemsState): SharedHeldItemsPayload {
+  return [
+    encodeShareHeldItem(heldItems.leftArm),
+    encodeShareHeldItem(heldItems.rightArm),
+  ];
+}
+
+function decodeShareHeldItems(payload: unknown): HeldItemsState {
+  if (!Array.isArray(payload)) {
+    return cloneHeldItems();
+  }
+
+  return {
+    leftArm: decodeShareHeldItem(payload[0]),
+    rightArm: decodeShareHeldItem(payload[1]),
+  };
+}
+
+function buildHeldItemGeometryKey(heldItems: HeldItemsState): string {
+  return HELD_ITEM_ARM_IDS.map((armId) => {
+    const heldItem = heldItems[armId];
+
+    if (!heldItem) {
+      return `${armId}:none`;
+    }
+
+    const thickness = cloneHeldItemAdjustments(heldItem.adjustments).thickness;
+
+    return [
+      armId,
+      heldItem.sourceKind,
+      heldItem.presetId ?? "upload",
+      heldItem.source,
+      thickness,
+    ].join(":");
+  }).join("|");
+}
+
 function encodeWorkspaceForShare(
   workspaceFile: SerializableWorkspaceFile,
 ): SharedProjectPayload {
   return [
-    1,
+    2,
     workspaceFile.poseFileName,
     POSE_KEYS.map((poseKey) => workspaceFile.pose[poseKey]),
     encodeShareSelection(workspaceFile.selectedPoseSelection),
@@ -1447,11 +1821,16 @@ function encodeWorkspaceForShare(
     armModelToShareCode(workspaceFile.resolvedModel),
     modelPreferenceToShareCode(workspaceFile.uploadModel),
     avatarTypeToShareCode(workspaceFile.avatarType),
+    encodeShareHeldItems(workspaceFile.heldItems),
+    workspaceFile.showHeldItems ? 1 : 0,
   ];
 }
 
 function decodeSharedProjectPayload(payload: unknown): ImportedWorkspaceFile {
-  if (!Array.isArray(payload) || payload[0] !== 1) {
+  if (
+    !Array.isArray(payload) ||
+    (payload[0] !== 1 && payload[0] !== 2)
+  ) {
     throw new Error("That shared project link is invalid.");
   }
 
@@ -1471,19 +1850,24 @@ function decodeSharedProjectPayload(payload: unknown): ImportedWorkspaceFile {
   const selectedPresetIndex =
     typeof sharePayload[4] === "number" ? Math.trunc(sharePayload[4]) : -1;
   const selectedPreset = PRESET_NAMES[selectedPresetIndex] ?? null;
+  const heldItems = sharePayload[0] === 2
+    ? decodeShareHeldItems(sharePayload[11])
+    : cloneHeldItems();
 
   return {
-    version: 1,
+    version: sharePayload[0],
     poseFileName:
       typeof sharePayload[1] === "string" && sharePayload[1].trim()
         ? sharePayload[1].trim()
         : "shared-project.mcpose",
     pose: nextPose,
+    heldItems,
     skin: decodeShareSkin(sharePayload[7], resolvedModel),
     selectedPoseSelection: decodeShareSelection(sharePayload[3]),
     selectedPreset,
     showOuterLayer: sharePayload[5] !== 0,
     showOuterLayerIn3d: sharePayload[6] === 1,
+    showHeldItems: sharePayload[12] !== 0,
     resolvedModel,
     uploadModel: modelPreferenceFromShareCode(sharePayload[9]),
     avatarType: avatarTypeFromShareCode(sharePayload[10]),
@@ -1818,11 +2202,13 @@ function createWorkspaceDocument(
     id: globalThis.crypto?.randomUUID?.() ?? `doc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     poseFileName: normalizePoseFileName(rawName),
     fileHandle: overrides.fileHandle ?? null,
+    heldItems: cloneHeldItems(overrides.heldItems),
     pose: clonePose(overrides.pose ?? NEUTRAL_POSE),
     selectedPoseSelection: overrides.selectedPoseSelection ?? DEFAULT_POSE_SELECTION,
     selectedPreset: overrides.selectedPreset ?? "neutral",
     showOuterLayer: overrides.showOuterLayer ?? true,
     showOuterLayerIn3d: overrides.showOuterLayerIn3d ?? false,
+    showHeldItems: overrides.showHeldItems ?? true,
     skin: overrides.skin ?? null,
     avatarType: overrides.avatarType ?? "default",
     resolvedModel: overrides.resolvedModel ?? null,
@@ -1850,6 +2236,8 @@ export default function App() {
   const suppressViewportClickRef = useRef(false);
   const selectedOutlineRef = useRef<Group | null>(null);
   const outerLayerVoxelMeshesRef = useRef<OuterLayerVoxelMeshes>({});
+  const heldItemMeshesRef = useRef<HeldItemMeshes>({});
+  const heldItemBuildRequestIdRef = useRef(0);
   const sceneDebugCubeRef = useRef<Mesh | null>(null);
   const sceneDebugVoxelCloneRef = useRef<Mesh | null>(null);
   const documentsRef = useRef<WorkspaceDocument[]>([initialDocument]);
@@ -1874,6 +2262,7 @@ export default function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [helpContactModalKind, setHelpContactModalKind] = useState<HelpContactModalKind | null>(null);
+  const [heldItemModalArmId, setHeldItemModalArmId] = useState<HeldItemArmId | null>(null);
   const [isStartupModalOpen, setIsStartupModalOpen] = useState(true);
   const [isNewFileModalOpen, setIsNewFileModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -1904,15 +2293,18 @@ export default function App() {
   const {
     poseFileName,
     pose,
+    heldItems,
     selectedPoseSelection,
     selectedPreset,
     showOuterLayer,
     showOuterLayerIn3d,
+    showHeldItems,
     skin,
     avatarType,
     resolvedModel,
     uploadModel,
   } = activeDocument;
+  const heldItemGeometryKey = buildHeldItemGeometryKey(heldItems);
 
   useEffect(() => {
     documentsRef.current = documents;
@@ -1937,6 +2329,9 @@ export default function App() {
   useEffect(() => {
     viewportLightingModeRef.current = viewportLightingMode;
   }, [viewportLightingMode]);
+  useEffect(() => {
+    closeHeldItemModal();
+  }, [activeDocumentId]);
 
   useEffect(() => {
     const activeSkinLabel = skin?.label?.trim() ?? "";
@@ -2042,6 +2437,16 @@ export default function App() {
     if (canRevokeSkinSource(currentSkin)) {
       URL.revokeObjectURL(currentSkin.source);
     }
+  }
+
+  function releaseDocumentHeldItems(document: WorkspaceDocument): void {
+    HELD_ITEM_ARM_IDS.forEach((armId) => {
+      const heldItem = document.heldItems[armId];
+
+      if (canRevokeHeldItemSource(heldItem)) {
+        URL.revokeObjectURL(heldItem.source);
+      }
+    });
   }
 
   function updateDocument(
@@ -2266,7 +2671,21 @@ export default function App() {
       return selection.id;
     }
 
+    if (selection.kind === "heldItem") {
+      return selection.id;
+    }
+
     return POSE_BONES.find((bone) => bone.fields.some((field) => field.key === selection.id))?.id ?? "head";
+  }
+
+  function resolveSelectedHeldItemArmId(selection: PoseSelection): HeldItemArmId | null {
+    if (selection.kind === "heldItem") {
+      return selection.id;
+    }
+
+    return selection.kind === "bone" && isHeldItemArmId(selection.id)
+      ? selection.id
+      : null;
   }
 
   function getViewerBonePickRoot(viewer: SkinViewer, boneId: PoseBoneId): Object3D {
@@ -2290,11 +2709,19 @@ export default function App() {
     viewer: SkinViewer,
     boneId: PoseBoneId,
   ): Object3D[] {
+    const heldItemOutlineObject = isHeldItemArmId(boneId)
+      ? showHeldItems
+        ? heldItemMeshesRef.current[boneId]
+        : null
+      : null;
+
     if (avatarType === "advanced" && isAdvancedAvatarActive(viewer)) {
       const advancedOutlineObjects = getAdvancedAvatarOutlineObjects(viewer, boneId);
 
       if (advancedOutlineObjects && advancedOutlineObjects.length > 0) {
-        return advancedOutlineObjects;
+        return heldItemOutlineObject
+          ? [...advancedOutlineObjects, heldItemOutlineObject]
+          : advancedOutlineObjects;
       }
     }
 
@@ -2304,14 +2731,168 @@ export default function App() {
     }>;
 
     if (showOuterLayer && targetPart.outerLayer) {
-      return [targetPart.outerLayer];
+      return heldItemOutlineObject
+        ? [targetPart.outerLayer, heldItemOutlineObject]
+        : [targetPart.outerLayer];
     }
 
     if (targetPart.innerLayer) {
-      return [targetPart.innerLayer];
+      return heldItemOutlineObject
+        ? [targetPart.innerLayer, heldItemOutlineObject]
+        : [targetPart.innerLayer];
     }
 
-    return [getViewerBonePickRoot(viewer, boneId)];
+    const defaultTarget = getViewerBonePickRoot(viewer, boneId);
+
+    return heldItemOutlineObject ? [defaultTarget, heldItemOutlineObject] : [defaultTarget];
+  }
+
+  function disposeHeldItemMeshes(): void {
+    Object.values(heldItemMeshesRef.current).forEach((heldItemGroup) => {
+      if (!heldItemGroup) {
+        return;
+      }
+
+      heldItemGroup.removeFromParent();
+      heldItemGroup.traverse((descendant) => {
+        if (!(descendant instanceof Mesh)) {
+          return;
+        }
+
+        descendant.geometry.dispose();
+        disposeOwnedMeshMaterials(descendant);
+      });
+    });
+
+    heldItemMeshesRef.current = {};
+  }
+
+  function resolveHeldItemAttachmentParent(
+    viewer: SkinViewer,
+    armId: HeldItemArmId,
+  ): Object3D {
+    if (avatarType === "advanced" && isAdvancedAvatarActive(viewer)) {
+      return getAdvancedAvatarHandAnchor(viewer, armId) ?? viewer.playerObject.skin[armId];
+    }
+
+    return viewer.playerObject.skin[armId];
+  }
+
+  function applyHeldItemVisibility(isVisible: boolean): void {
+    Object.values(heldItemMeshesRef.current).forEach((heldItemGroup) => {
+      if (heldItemGroup) {
+        heldItemGroup.visible = isVisible;
+      }
+    });
+  }
+
+  function applyHeldItemTransform(
+    heldItemGroup: Group,
+    armId: HeldItemArmId,
+    modelType: ArmModel,
+    adjustments: HeldItemAdjustments,
+  ): void {
+    const direction = armId === "leftArm" ? 1 : -1;
+    const horizontalOffset = modelType === "slim" ? 0.55 : 0.75;
+    const baseYRotation = armId === "leftArm" ? Math.PI : 0;
+    const forwardPitch = Math.PI / 4;
+    const normalizedAdjustments = cloneHeldItemAdjustments(adjustments);
+    const radiansPerDegree = Math.PI / 180;
+
+    heldItemGroup.position.set(
+      direction * (horizontalOffset + normalizedAdjustments.offsetX),
+      -6.45 + normalizedAdjustments.offsetY,
+      5.35 + normalizedAdjustments.offsetZ,
+    );
+    heldItemGroup.rotation.set(
+      forwardPitch + normalizedAdjustments.rotationX * radiansPerDegree,
+      baseYRotation + direction * (Math.PI / 2) + normalizedAdjustments.rotationY * radiansPerDegree,
+      direction * 0.22 + normalizedAdjustments.rotationZ * radiansPerDegree,
+    );
+    heldItemGroup.scale.setScalar(0.68 * Math.max(0.1, normalizedAdjustments.scale));
+  }
+
+  function syncHeldItemMeshTransforms(viewer: SkinViewer, nextHeldItems: HeldItemsState): boolean {
+    const modelType = viewer.playerObject.skin.modelType as ArmModel;
+    let hasChanges = false;
+
+    HELD_ITEM_ARM_IDS.forEach((armId) => {
+      const heldItemGroup = heldItemMeshesRef.current[armId];
+      const heldItem = nextHeldItems[armId];
+
+      if (!heldItemGroup || !heldItem) {
+        return;
+      }
+
+      const attachmentParent = resolveHeldItemAttachmentParent(viewer, armId);
+
+      if (heldItemGroup.parent !== attachmentParent) {
+        attachmentParent.add(heldItemGroup);
+      }
+
+      heldItemGroup.visible = showHeldItems;
+      applyHeldItemTransform(heldItemGroup, armId, modelType, heldItem.adjustments);
+      hasChanges = true;
+    });
+
+    return hasChanges;
+  }
+
+  async function rebuildHeldItemMeshes(viewer: SkinViewer, nextHeldItems: HeldItemsState): Promise<void> {
+    const requestId = heldItemBuildRequestIdRef.current;
+    const nextHeldItemMeshes: HeldItemMeshes = {};
+    const modelType = viewer.playerObject.skin.modelType as ArmModel;
+
+    for (const armId of HELD_ITEM_ARM_IDS) {
+      const heldItem = nextHeldItems[armId];
+
+      if (!heldItem) {
+        continue;
+      }
+
+      const voxelGeometry = await createHeldItemVoxelGeometry(
+        heldItem.source,
+        heldItem.adjustments.thickness,
+      );
+
+      if (heldItemBuildRequestIdRef.current !== requestId) {
+        voxelGeometry?.dispose();
+        return;
+      }
+
+      if (!voxelGeometry) {
+        continue;
+      }
+
+      const heldItemMaterial = new MeshStandardMaterial({
+        alphaTest: 1 / 255,
+        flatShading: true,
+        metalness: 0,
+        roughness: 1,
+        transparent: true,
+        vertexColors: true,
+      });
+      const heldItemMesh = new Mesh(voxelGeometry, heldItemMaterial);
+      const heldItemGroup = new Group();
+
+      heldItemMesh.name = `${armId}-held-item-mesh`;
+      heldItemMesh.frustumCulled = false;
+      heldItemGroup.name = `${armId}-held-item-group`;
+      heldItemGroup.add(heldItemMesh);
+      heldItemGroup.visible = showHeldItems;
+      applyHeldItemTransform(heldItemGroup, armId, modelType, heldItem.adjustments);
+      resolveHeldItemAttachmentParent(viewer, armId).add(heldItemGroup);
+      nextHeldItemMeshes[armId] = heldItemGroup;
+    }
+
+    if (heldItemBuildRequestIdRef.current !== requestId) {
+      Object.values(nextHeldItemMeshes).forEach((heldItemGroup) => {
+        heldItemGroup?.removeFromParent();
+      });
+      return;
+    }
+
+    heldItemMeshesRef.current = nextHeldItemMeshes;
   }
 
   function getViewerOuterLayerMeshes(viewer: SkinViewer): {
@@ -2458,14 +3039,16 @@ export default function App() {
     overridePoseFileName = documentToSerialize.poseFileName,
   ): Promise<SerializableWorkspaceFile> {
     return {
-      version: 1,
+      version: 2,
       poseFileName: overridePoseFileName,
+      heldItems: await serializeWorkspaceHeldItems(documentToSerialize.heldItems),
       pose: clonePose(documentToSerialize.pose),
       skin: await serializeWorkspaceSkin(documentToSerialize.skin),
       selectedPoseSelection: documentToSerialize.selectedPoseSelection,
       selectedPreset: documentToSerialize.selectedPreset,
       showOuterLayer: documentToSerialize.showOuterLayer,
       showOuterLayerIn3d: documentToSerialize.showOuterLayerIn3d,
+      showHeldItems: documentToSerialize.showHeldItems,
       resolvedModel: documentToSerialize.resolvedModel,
       avatarType: documentToSerialize.avatarType,
       uploadModel: documentToSerialize.uploadModel,
@@ -2546,6 +3129,8 @@ export default function App() {
     let hasOutlineMesh = false;
 
     targetObjects.forEach((targetObject) => {
+      targetObject.updateWorldMatrix(true, true);
+
       targetObject.traverse((descendant) => {
         if (!(descendant instanceof Mesh)) {
           return;
@@ -2709,7 +3294,9 @@ export default function App() {
       return null;
     }
 
-    switch (selection.id) {
+    const selectedBoneId = resolveSelectedBoneId(selection);
+
+    switch (selectedBoneId) {
       case "head":
         return {
           object: viewer.playerObject.skin.head,
@@ -2739,8 +3326,8 @@ export default function App() {
       case "rightArm":
       case "leftLeg":
       case "rightLeg": {
-        const object = resolvePrimaryRotationObject(viewer, selection.id);
-        const axisPrefix = selection.id;
+        const object = resolvePrimaryRotationObject(viewer, selectedBoneId);
+        const axisPrefix = selectedBoneId;
 
         return {
           object,
@@ -2819,10 +3406,14 @@ export default function App() {
       return;
     }
 
-    const selectedBoneId = resolveSelectedBoneId(selectedPoseSelection);
-    const selectedOutline = createSelectedOutline(
-      getViewerBoneOutlineObjects(viewer, selectedBoneId),
-    );
+    const selectedHeldItemArmId = resolveSelectedHeldItemArmId(selectedPoseSelection);
+    const outlineTargets =
+      selectedPoseSelection.kind === "heldItem" && selectedHeldItemArmId
+        ? showHeldItems && heldItemMeshesRef.current[selectedHeldItemArmId]
+          ? [heldItemMeshesRef.current[selectedHeldItemArmId]!]
+          : getViewerBoneOutlineObjects(viewer, selectedHeldItemArmId)
+        : getViewerBoneOutlineObjects(viewer, resolveSelectedBoneId(selectedPoseSelection));
+    const selectedOutline = createSelectedOutline(outlineTargets);
 
     if (!selectedOutline) {
       return;
@@ -2850,6 +3441,7 @@ export default function App() {
         : null,
       showOuterLayer,
       showOuterLayerIn3d,
+      showHeldItems,
       voxelMeshes: Object.fromEntries(
         (Object.entries(outerLayerVoxelMeshesRef.current) as Array<
           [PoseBoneId, Mesh | undefined]
@@ -3026,6 +3618,7 @@ export default function App() {
     }
 
     disposeSelectedOutline();
+    disposeHeldItemMeshes();
     disposeOuterLayerVoxelMeshes();
     viewer.loadSkin(null);
     viewer.render();
@@ -3095,6 +3688,14 @@ export default function App() {
     setHelpContactModalKind(null);
   }
 
+  function closeHeldItemModal(): void {
+    setHeldItemModalArmId(null);
+  }
+
+  function openHeldItemModal(armId: HeldItemArmId): void {
+    setHeldItemModalArmId(armId);
+  }
+
   function openIdeasModal(): void {
     setHelpContactModalKind("ideas");
   }
@@ -3142,6 +3743,128 @@ export default function App() {
     setExportPreviewError(null);
     setExportPreviewUrl(null);
     setIsExportModalOpen(true);
+  }
+
+  function applyHeldItemToArm(armId: HeldItemArmId, nextHeldItem: HeldItem): void {
+    updateDocument(activeDocumentId, (currentDocument) => {
+      const previousHeldItem = currentDocument.heldItems[armId];
+      const appliedHeldItem = {
+        ...nextHeldItem,
+        adjustments: cloneHeldItemAdjustments(
+          previousHeldItem?.adjustments ?? nextHeldItem.adjustments,
+        ),
+      };
+
+      if (
+        canRevokeHeldItemSource(previousHeldItem) &&
+        previousHeldItem.source !== appliedHeldItem.source
+      ) {
+        URL.revokeObjectURL(previousHeldItem.source);
+      }
+
+      return {
+        ...currentDocument,
+        heldItems: {
+          ...currentDocument.heldItems,
+          [armId]: appliedHeldItem,
+        },
+        selectedPoseSelection: { kind: "heldItem", id: armId },
+      };
+    });
+    setError(null);
+    setStatus(`${nextHeldItem.label} is now held in the ${formatHeldItemArmLabel(armId).toLowerCase()}.`);
+    closeHeldItemModal();
+  }
+
+  function updateHeldItemAdjustment(
+    armId: HeldItemArmId,
+    adjustmentKey: keyof HeldItemAdjustments,
+    value: number,
+  ): void {
+    updateDocument(activeDocumentId, (currentDocument) => {
+      const heldItem = currentDocument.heldItems[armId];
+
+      if (!heldItem) {
+        return currentDocument;
+      }
+
+      return {
+        ...currentDocument,
+        heldItems: {
+          ...currentDocument.heldItems,
+          [armId]: {
+            ...heldItem,
+            adjustments: {
+              ...cloneHeldItemAdjustments(heldItem.adjustments),
+              [adjustmentKey]: value,
+            },
+          },
+        },
+      };
+    });
+    setError(null);
+  }
+
+  function resetHeldItemAdjustments(armId: HeldItemArmId): void {
+    updateDocument(activeDocumentId, (currentDocument) => {
+      const heldItem = currentDocument.heldItems[armId];
+
+      if (!heldItem) {
+        return currentDocument;
+      }
+
+      return {
+        ...currentDocument,
+        heldItems: {
+          ...currentDocument.heldItems,
+          [armId]: {
+            ...heldItem,
+            adjustments: createDefaultHeldItemAdjustments(),
+          },
+        },
+      };
+    });
+    setError(null);
+    setStatus(`Reset held item controls for the ${formatHeldItemArmLabel(armId).toLowerCase()}.`);
+  }
+
+  function handleHeldItemPresetSelect(presetId: HeldItemPresetId): void {
+    if (!heldItemModalArmId) {
+      return;
+    }
+
+    applyHeldItemToArm(heldItemModalArmId, buildPresetHeldItem(presetId));
+  }
+
+  function handleHeldItemUploadSelect(file: File): void {
+    if (!heldItemModalArmId) {
+      return;
+    }
+
+    applyHeldItemToArm(
+      heldItemModalArmId,
+      createUploadedHeldItem(file, URL.createObjectURL(file)),
+    );
+  }
+
+  function removeHeldItemFromArm(armId: HeldItemArmId): void {
+    updateDocument(activeDocumentId, (currentDocument) => {
+      const previousHeldItem = currentDocument.heldItems[armId];
+
+      if (canRevokeHeldItemSource(previousHeldItem)) {
+        URL.revokeObjectURL(previousHeldItem.source);
+      }
+
+      return {
+        ...currentDocument,
+        heldItems: {
+          ...currentDocument.heldItems,
+          [armId]: null,
+        },
+      };
+    });
+    setError(null);
+    setStatus(`Removed the held item from the ${formatHeldItemArmLabel(armId).toLowerCase()}.`);
   }
 
   useEffect(() => {
@@ -3362,6 +4085,7 @@ export default function App() {
       rotationGizmo.removeFromParent();
       rotationGizmo.dispose();
       rotationGizmoDraftPoseRef.current = null;
+      disposeHeldItemMeshes();
       disposeOuterLayerVoxelMeshes();
       disposeViewerViewportMaterialVariants(viewer);
       viewportGizmo?.dispose();
@@ -3374,6 +4098,7 @@ export default function App() {
       sceneDebugVoxelCloneRef.current?.removeFromParent();
       sceneDebugVoxelCloneRef.current = null;
       documentsRef.current.forEach(releaseDocumentUploadSkin);
+      documentsRef.current.forEach(releaseDocumentHeldItems);
       viewer.dispose();
       viewerRef.current = null;
       (window as DebugWindow).__MC_POSER_DEBUG_HELPERS__ = undefined;
@@ -3455,6 +4180,7 @@ export default function App() {
     if (!viewer || !skin) {
       if (viewer) {
         disposeSelectedOutline();
+        disposeHeldItemMeshes();
         disposeOuterLayerVoxelMeshes();
         disposeViewerViewportMaterialVariants(viewer);
         viewer.loadSkin(null);
@@ -3471,6 +4197,7 @@ export default function App() {
     const loadSkinIntoViewer = async () => {
       try {
         disposeViewerViewportMaterialVariants(viewer);
+        disposeHeldItemMeshes();
         disposeOuterLayerVoxelMeshes();
 
         await viewer.loadSkin(skin.source, {
@@ -3523,7 +4250,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [activeDocumentId, skin?.source, skin?.modelPreference, showOuterLayer, showOuterLayerIn3d]);
+  }, [activeDocumentId, skin?.source, skin?.modelPreference]);
 
   useEffect(() => {
     const viewer = viewerRef.current;
@@ -3540,6 +4267,89 @@ export default function App() {
     viewer.render();
     publishDebugState(viewer);
   }, [avatarType, pose, showOuterLayer, showOuterLayerIn3d, skin]);
+
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    const requestId = ++heldItemBuildRequestIdRef.current;
+
+    disposeHeldItemMeshes();
+
+    if (!viewer || !skin || isLoading) {
+      if (viewer) {
+        syncSelectedOutline();
+        viewer.render();
+        publishDebugState(viewer);
+      }
+
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        await rebuildHeldItemMeshes(viewer, heldItems);
+
+        if (cancelled || heldItemBuildRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        applyViewportLighting(viewer, viewportLightingModeRef.current);
+        syncSelectedOutline();
+        viewer.render();
+        publishDebugState(viewer);
+      } catch (heldItemError) {
+        if (cancelled || heldItemBuildRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        setError(
+          heldItemError instanceof Error
+            ? heldItemError.message
+            : "Unable to render the held item.",
+        );
+        setStatus("Held item render failed.");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+
+      if (heldItemBuildRequestIdRef.current === requestId) {
+        disposeHeldItemMeshes();
+      }
+    };
+  }, [activeDocumentId, avatarType, heldItemGeometryKey, isLoading, skin]);
+
+  useEffect(() => {
+    const viewer = viewerRef.current;
+
+    if (!viewer || !skin || isLoading) {
+      return;
+    }
+
+    if (!syncHeldItemMeshTransforms(viewer, heldItems)) {
+      return;
+    }
+
+    syncSelectedOutline();
+    viewer.render();
+    publishDebugState(viewer);
+  }, [heldItems, isLoading, skin]);
+
+  useEffect(() => {
+    const viewer = viewerRef.current;
+
+    applyHeldItemVisibility(showHeldItems);
+
+    if (!viewer || !skin) {
+      return;
+    }
+
+    syncSelectedOutline();
+    viewer.render();
+    publishDebugState(viewer);
+  }, [showHeldItems, skin]);
 
   async function loadUsername(nextUsername: string, targetDocumentId = activeDocumentId): Promise<void> {
     const trimmedUsername = nextUsername.trim();
@@ -3737,6 +4547,7 @@ export default function App() {
         ? parsedFile.poseFileName
         : fallbackFileName,
       {
+        heldItems: normalizeImportedHeldItems(parsedFile.heldItems),
         pose: normalizeImportedPose(parsedFile.pose),
         skin: importedSkin,
         selectedPoseSelection: normalizeImportedSelection(
@@ -3755,6 +4566,10 @@ export default function App() {
           typeof parsedFile.showOuterLayerIn3d === "boolean"
             ? parsedFile.showOuterLayerIn3d
             : false,
+        showHeldItems:
+          typeof parsedFile.showHeldItems === "boolean"
+            ? parsedFile.showHeldItems
+            : true,
         avatarType: isAvatarType(parsedFile.avatarType)
           ? parsedFile.avatarType
           : "default",
@@ -3921,6 +4736,12 @@ export default function App() {
     updateDocument(activeDocumentId, (currentDocument) => ({
       ...currentDocument,
       selectedPoseSelection: { kind: "bone", id: nextBoneId },
+    }));
+  }
+  function handleSelectHeldItem(nextArmId: HeldItemArmId): void {
+    updateDocument(activeDocumentId, (currentDocument) => ({
+      ...currentDocument,
+      selectedPoseSelection: { kind: "heldItem", id: nextArmId },
     }));
   }
 
@@ -4429,6 +5250,7 @@ export default function App() {
           avatarType={avatarType}
           selectedSelection={selectedPoseSelection}
           onSelectBone={handleSelectBone}
+          onSelectHeldItem={handleSelectHeldItem}
           onSelectJoint={handleSelectJoint}
         />
 
@@ -4443,11 +5265,23 @@ export default function App() {
 
         <RightSidebar
           avatarType={avatarType}
+          heldItems={heldItems}
           selectedSelection={selectedPoseSelection}
           pose={pose}
           showOuterLayer={showOuterLayer}
           showOuterLayerIn3d={showOuterLayerIn3d}
+          showHeldItems={showHeldItems}
+          onOpenHeldItemModal={openHeldItemModal}
+          onRemoveHeldItem={removeHeldItemFromArm}
+          onResetHeldItemAdjustments={resetHeldItemAdjustments}
+          onUpdateHeldItemAdjustment={updateHeldItemAdjustment}
           onUpdatePose={updatePose}
+          onToggleHeldItems={(nextValue) => {
+            updateDocument(activeDocumentId, (document) => ({
+              ...document,
+              showHeldItems: nextValue,
+            }));
+          }}
           onToggleOuterLayer={(nextValue) => {
             updateDocument(activeDocumentId, (document) => ({
               ...document,
@@ -4558,6 +5392,15 @@ export default function App() {
       <HelpContactModal
         kind={helpContactModalKind}
         onClose={closeHelpContactModal}
+      />
+
+      <HeldItemModal
+        armId={heldItemModalArmId}
+        currentItem={heldItemModalArmId ? heldItems[heldItemModalArmId] : null}
+        isOpen={heldItemModalArmId !== null}
+        onClose={closeHeldItemModal}
+        onSelectPreset={handleHeldItemPresetSelect}
+        onSelectUpload={handleHeldItemUploadSelect}
       />
 
       <StartupModal
