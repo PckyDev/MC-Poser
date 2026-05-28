@@ -144,13 +144,6 @@ export function HeldItemModal({
 
         <div className="item-modal-body">
           <section className="startup-section modal-page-section">
-            <div className="modal-section-header">
-              <h3>Item source</h3>
-              <p className="modal-section-copy">
-                Presets are included with the editor. Custom PNG uploads are converted into voxel sprites.
-              </p>
-            </div>
-
             <div className="new-file-source-tabs" role="tablist" aria-label="Held item source options">
               <button
                 className={isPresetTab ? "new-file-source-tab is-active" : "new-file-source-tab"}
@@ -245,13 +238,6 @@ export function HeldItemModal({
 
           <aside className="item-modal-sidebar">
             <section className="startup-section modal-page-section item-modal-preview-card">
-              <div className="modal-section-header">
-                <h3>Preview</h3>
-                <p className="modal-section-copy">
-                  The held item is attached to the {armLabel.toLowerCase()} and follows shoulder and elbow bends.
-                </p>
-              </div>
-
               <div className="item-modal-preview-frame">
                 {isPresetTab || uploadedPreviewUrl ? (
                   <img
@@ -276,10 +262,6 @@ export function HeldItemModal({
         </div>
 
         <div className="document-footer modal-footer">
-          <p className="document-footer-copy modal-footer-copy">
-            Held items use the same pixelated texture language as the rest of the editor.
-          </p>
-
           <div className="modal-footer-actions">
             <button className="toolbar-button" type="button" onClick={onClose}>
               Cancel

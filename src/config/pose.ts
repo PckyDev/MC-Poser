@@ -7,7 +7,7 @@ import type {
 } from "../types/editor";
 
 export const DEFAULT_USERNAME = "Notch";
-export const QUICK_LOADS = ["Notch", "Technoblade", "Grian", "GoodTimesWithScar"] as const;
+export const QUICK_LOADS = ["Notch", "Technoblade", "Grian"] as const;
 
 export const NEUTRAL_POSE: PoseState = {
   headPitch: 0,

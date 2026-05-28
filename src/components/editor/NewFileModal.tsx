@@ -116,18 +116,13 @@ export function NewFileModal({
         <div className="startup-modal-body">
           <section className="startup-section modal-page-section">
             <div className="modal-section-header">
-              <h3>File details</h3>
-              <p className="modal-section-copy">
-                Choose the pose-file name that will appear in the workspace tabs.
-              </p>
+              <h3>File name</h3>
             </div>
 
-            <label className="form-label" htmlFor="startup-file-name">
-              Pose file name
-            </label>
             <input
               id="startup-file-name"
               className="editor-input"
+              aria-label="Pose file name"
               value={startupFileName}
               onChange={(event) => onStartupFileNameChange(event.target.value)}
               onBlur={onStartupFileNameBlur}
@@ -138,9 +133,6 @@ export function NewFileModal({
             <section className="startup-section modal-page-section">
               <div className="modal-section-header">
                 <h3>Skin source</h3>
-                <p className="modal-section-copy">
-                  New files must start from a username skin lookup or an uploaded PNG.
-                </p>
               </div>
 
               <div className="new-file-source-tabs" role="tablist" aria-label="Skin source options">
@@ -170,12 +162,10 @@ export function NewFileModal({
 
               {isNameTab ? (
                 <div className="new-file-tab-panel">
-                  <label className="form-label" htmlFor="startup-username">
-                    Username lookup
-                  </label>
                   <input
                     id="startup-username"
                     className="editor-input"
+                    aria-label="Username lookup"
                     value={startupUsername}
                     onChange={(event) => onStartupUsernameChange(event.target.value)}
                     placeholder="Notch"
@@ -235,9 +225,6 @@ export function NewFileModal({
             <section className="startup-section modal-page-section">
               <div className="modal-section-header">
                 <h3>Avatar type</h3>
-                <p className="modal-section-copy">
-                  Choose the body proportions used for this workspace.
-                </p>
               </div>
 
               <div className="avatar-type-grid" role="list" aria-label="Avatar type options">
@@ -263,10 +250,6 @@ export function NewFileModal({
         </div>
 
         <div className="startup-footer modal-footer">
-          <p className="startup-footer-copy modal-footer-copy">
-            Blank files are not allowed. Pick a skin source to create the workspace.
-          </p>
-
           <div className="modal-footer-actions">
             <button className="toolbar-button" type="button" onClick={onClose}>
               Cancel

@@ -33,7 +33,7 @@ export function LeftSidebar({
           </div>
         </div>
 
-        <div className="panel-content panel-content--scroll panel-content--stacked">
+        <div className="panel-content panel-content--scroll panel-content--stacked panel-content--flush">
           <div className="bone-tree">
             {visibleBones.map((bone) => {
               const heldItemArmId =

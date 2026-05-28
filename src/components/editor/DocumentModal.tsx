@@ -1,6 +1,6 @@
 import { useEffect, useId, useState, type FormEvent } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCube, faFileLines, faImage, faUser, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faFileLines, faImage, faUser, faXmark } from "@fortawesome/free-solid-svg-icons";
 
 import { QUICK_LOADS } from "../../config/pose";
 import type { AvatarType, ModelPreference } from "../../types/editor";
@@ -8,7 +8,6 @@ import { formatAvatarTypeLabel, formatPresetName } from "../../utils/editor";
 
 const DOCUMENT_MODAL_PAGES = [
   { id: "pose-file", label: "Pose File", icon: faFileLines },
-  { id: "current-asset", label: "Current Asset", icon: faCube },
   { id: "avatar-type", label: "Avatar Type", icon: faUser },
   { id: "skin-source", label: "Skin Source", icon: faImage },
 ];
@@ -100,8 +99,10 @@ export function DocumentModal({
   }
 
   const isPoseFilePage = activePage === "pose-file";
-  const isCurrentAssetPage = activePage === "current-asset";
   const isAvatarTypePage = activePage === "avatar-type";
+  const showFooterActions = !isPoseFilePage && !isAvatarTypePage;
+  const assetDetailLabel = assetDetail?.startsWith("UUID ") ? "UUID" : "Detail";
+  const assetDetailValue = assetDetail?.startsWith("UUID ") ? assetDetail.slice(5) : assetDetail;
 
   return (
     <div className="document-overlay">
@@ -114,9 +115,7 @@ export function DocumentModal({
         <div className="document-header modal-header">
           <div>
             <h2 id="document-modal-title">Document</h2>
-            <p className="document-copy modal-copy">
-              Manage the current pose file and swap skin sources here so the main sidebar stays focused on presets.
-            </p>
+            <p className="document-copy modal-copy">Manage the current pose file.</p>
           </div>
 
           <div className="document-header-actions">
@@ -158,12 +157,10 @@ export function DocumentModal({
                   </p>
                 </div>
 
-                <label className="form-label" htmlFor="document-pose-file-name">
-                  Current pose file
-                </label>
                 <input
                   id="document-pose-file-name"
                   className="editor-input"
+                  aria-label="Current pose file"
                   value={poseFileName}
                   onChange={(event) => onPoseFileNameChange(event.target.value)}
                   onBlur={onPoseFileNameBlur}
@@ -178,18 +175,6 @@ export function DocumentModal({
                     <span>Rig state</span>
                     <strong>{isRigModified ? "Modified" : "Neutral"}</strong>
                   </div>
-                </div>
-              </section>
-            ) : isCurrentAssetPage ? (
-              <section className="modal-page-section">
-                <div className="modal-section-header">
-                  <h3>Current asset</h3>
-                  <p className="modal-section-copy">
-                    Inspect the loaded character, source type, arm model, and active pose preset for the current scene.
-                  </p>
-                </div>
-
-                <div className="info-grid info-grid--single">
                   <div className="info-card">
                     <span>Character</span>
                     <strong>{skinLabel ?? "Empty scene"}</strong>
@@ -210,11 +195,13 @@ export function DocumentModal({
                     <span>Selection</span>
                     <strong>{selectedPreset ? formatPresetName(selectedPreset) : "Custom"}</strong>
                   </div>
+                  {assetDetailValue ? (
+                    <div className="info-card">
+                      <span>{assetDetailLabel}</span>
+                      <strong>{assetDetailValue}</strong>
+                    </div>
+                  ) : null}
                 </div>
-
-                <p className="panel-note">
-                  {assetDetail ?? "Open the startup modal or load a skin from the document modal."}
-                </p>
               </section>
             ) : isAvatarTypePage ? (
               <section className="modal-page-section">
@@ -248,19 +235,14 @@ export function DocumentModal({
               <section className="modal-page-section">
                 <div className="modal-section-header">
                   <h3>Skin source</h3>
-                  <p className="modal-section-copy">
-                    Load a skin from a username or upload a PNG, then choose the arm model used for local files.
-                  </p>
                 </div>
 
                 <form id={usernameFormId} className="editor-form" onSubmit={onUsernameSubmit}>
-                  <label className="form-label" htmlFor="document-username-input">
-                    Username lookup
-                  </label>
                   <div className="inline-form-row inline-form-row--single">
                     <input
                       id="document-username-input"
                       className="editor-input"
+                      aria-label="Username lookup"
                       autoComplete="off"
                       spellCheck={false}
                       value={username}
@@ -283,14 +265,10 @@ export function DocumentModal({
                   ))}
                 </div>
 
-                <div className="panel-divider" />
-
-                <label className="form-label" htmlFor="document-upload-model-select">
-                  Uploaded arm model
-                </label>
                 <select
                   id="document-upload-model-select"
                   className="editor-select"
+                  aria-label="Uploaded arm model"
                   value={uploadModel}
                   onChange={(event) => onUploadModelChange(event.target.value as ModelPreference)}
                 >
@@ -303,35 +281,23 @@ export function DocumentModal({
           </div>
         </div>
 
-        <div className="document-footer modal-footer">
-          <p className="document-footer-copy modal-footer-copy">
-            {isPoseFilePage
-              ? "Changes to the pose file name apply directly in the current editor session."
-              : isCurrentAssetPage
-                ? "The current asset page reflects the live scene in the editor viewport."
-                : isAvatarTypePage
-                  ? "Avatar type changes update the current workspace proportions immediately."
-              : "Use quick loads, a username lookup, or a PNG upload to swap the active skin source."}
-          </p>
-
-          <div className="modal-footer-actions">
-            {!isPoseFilePage && !isAvatarTypePage ? (
-              <>
-                <button className="toolbar-button" type="button" onClick={onOpenFilePicker}>
-                  Upload PNG
-                </button>
-                <button
-                  className="toolbar-button toolbar-button--accent"
-                  type="submit"
-                  form={usernameFormId}
-                  disabled={isLoading}
-                >
-                  Load Username
-                </button>
-              </>
-            ) : null}
+        {showFooterActions ? (
+          <div className="document-footer modal-footer">
+            <div className="modal-footer-actions">
+              <button className="toolbar-button" type="button" onClick={onOpenFilePicker}>
+                Upload PNG
+              </button>
+              <button
+                className="toolbar-button toolbar-button--accent"
+                type="submit"
+                form={usernameFormId}
+                disabled={isLoading}
+              >
+                Load Username
+              </button>
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
     </div>
   );
