@@ -5,6 +5,7 @@ import {
   AmbientLight,
   Box3,
   BoxGeometry,
+  BufferAttribute,
   BufferGeometry,
   CanvasTexture,
   DirectionalLight,
@@ -1312,6 +1313,55 @@ function getTexturePreviewDataUrl(texture: Texture | null): string | null {
   }
 }
 
+function rotateBoxFaceUvs180(geometry: BufferGeometry, faceIndex: number): void {
+  const uvAttribute = geometry.getAttribute("uv");
+
+  if (!(uvAttribute instanceof BufferAttribute)) {
+    return;
+  }
+
+  const faceStart = faceIndex * 8;
+  const currentFaceUvs = Array.from(uvAttribute.array as ArrayLike<number>).slice(
+    faceStart,
+    faceStart + 8,
+  );
+
+  if (currentFaceUvs.length < 8) {
+    return;
+  }
+
+  const rotatedFaceUvs: number[] = [
+    currentFaceUvs[6] ?? 0,
+    currentFaceUvs[7] ?? 0,
+    currentFaceUvs[4] ?? 0,
+    currentFaceUvs[5] ?? 0,
+    currentFaceUvs[2] ?? 0,
+    currentFaceUvs[3] ?? 0,
+    currentFaceUvs[0] ?? 0,
+    currentFaceUvs[1] ?? 0,
+  ];
+
+  uvAttribute.array.set(rotatedFaceUvs, faceStart);
+  uvAttribute.needsUpdate = true;
+}
+
+function applyClassicHeadBottomUvFix(viewer: SkinViewer): void {
+  if (viewer.playerObject.skin.modelType !== "default") {
+    return;
+  }
+
+  const headInnerLayer = viewer.playerObject.skin.head.innerLayer;
+  const headOuterLayer = viewer.playerObject.skin.head.outerLayer;
+
+  if (headInnerLayer instanceof Mesh) {
+    rotateBoxFaceUvs180(headInnerLayer.geometry, 3);
+  }
+
+  if (headOuterLayer instanceof Mesh) {
+    rotateBoxFaceUvs180(headOuterLayer.geometry, 3);
+  }
+}
+
 function sampleTexturePixel(
   pixelSource: TexturePixelSource,
   x: number,
@@ -1344,6 +1394,7 @@ function createOuterLayerVoxelGeometry(
   const { width, height, depth } = getOuterLayerDimensions(boneId, modelType);
   const textureOrigin = OUTER_LAYER_TEXTURE_ORIGINS[boneId];
   const surfaceOffset = getOuterLayerShellExpansion(boneId);
+  const rotateBottomFace180 = boneId === "head" && modelType === "default";
   const positions: number[] = [];
   const normals: number[] = [];
   const colors: number[] = [];
@@ -1474,9 +1525,13 @@ function createOuterLayerVoxelGeometry(
     { u: textureOrigin.u + width + depth, v: textureOrigin.v, width, height: depth },
     { axis: "y", outwardDirection: -1 },
     (pixelX, pixelY) => ({
-      x: -width / 2 + 0.5 + pixelX,
+      x: rotateBottomFace180
+        ? width / 2 - 0.5 - pixelX
+        : -width / 2 + 0.5 + pixelX,
       y: -height / 2 - surfaceOffset,
-      z: depth / 2 - 0.5 - pixelY,
+      z: rotateBottomFace180
+        ? -depth / 2 + 0.5 + pixelY
+        : depth / 2 - 0.5 - pixelY,
     }),
   );
 
@@ -4349,6 +4404,7 @@ export default function App() {
           return;
         }
 
+        applyClassicHeadBottomUvFix(viewer);
         setViewerSkinPreviewUrl(getTexturePreviewDataUrl(viewer.playerObject.skin.map));
         setAdvancedArmCapTextureOffsets(viewer, advancedArmCapTextureOffsets);
         setViewerInnerLayerVisible(viewer, true);

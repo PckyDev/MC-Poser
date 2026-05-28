@@ -411,6 +411,7 @@ function createVoxelGeometryFromSkinBox(
   skinRegion: SkinBoxRegion,
   pixelSource: TexturePixelSource,
   surfaceOffset: number,
+  rotateBottomFace180 = false,
 ): BufferGeometry | null {
   const positions: number[] = [];
   const normals: number[] = [];
@@ -536,9 +537,13 @@ function createVoxelGeometryFromSkinBox(
     { u: skinRegion.u + width + depth, v: skinRegion.v, width, height: depth },
     { axis: "y", outwardDirection: -1 },
     (pixelX, pixelY) => ({
-      x: -width / 2 + 0.5 + pixelX,
+      x: rotateBottomFace180
+        ? width / 2 - 0.5 - pixelX
+        : -width / 2 + 0.5 + pixelX,
       y: -height / 2 - surfaceOffset,
-      z: depth / 2 - 0.5 - pixelY,
+      z: rotateBottomFace180
+        ? -depth / 2 + 0.5 + pixelY
+        : depth / 2 - 0.5 - pixelY,
     }),
   );
 
@@ -1187,6 +1192,7 @@ function ensureHeadVoxelMesh(
     { u: 32, v: 0, width: 8, height: 8, depth: 8 },
     pixelSource,
     0.5,
+    state.modelType === "default",
   );
 
   if (!geometry) {
