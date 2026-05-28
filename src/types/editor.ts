@@ -47,6 +47,24 @@ export type PoseState = {
   headRoll: number;
 };
 
+export type ArmCapTextureTarget = "upperBottom" | "lowerTop";
+
+export type ArmCapTextureOffset = {
+  u: number;
+  v: number;
+};
+
+export type AdvancedArmCapTextureOffsets = {
+  leftArm: {
+    upperBottom: ArmCapTextureOffset;
+    lowerTop: ArmCapTextureOffset;
+  };
+  rightArm: {
+    upperBottom: ArmCapTextureOffset;
+    lowerTop: ArmCapTextureOffset;
+  };
+};
+
 export type PoseBoneId = "head" | "torso" | "leftArm" | "rightArm" | "leftLeg" | "rightLeg";
 
 export type PoseSelection =

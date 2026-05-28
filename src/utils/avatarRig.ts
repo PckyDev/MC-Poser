@@ -13,9 +13,21 @@ import {
   Vector3,
 } from "three";
 
-import type { ArmModel, HeldItemArmId, PoseBoneId, PoseState } from "../types/editor";
+import type {
+  ArmModel,
+  AdvancedArmCapTextureOffsets,
+  HeldItemArmId,
+  PoseBoneId,
+  PoseState,
+} from "../types/editor";
+import {
+  cloneAdvancedArmCapTextureOffsets,
+  createDefaultAdvancedArmCapTextureOffsets,
+  getArmCapTextureRegion,
+} from "./armCapTextureMap";
 
 const ADVANCED_RIG_STATE_KEY = "__mcPoserAdvancedRig";
+const ADVANCED_ARM_CAP_TEXTURE_OFFSETS_KEY = "__mcPoserAdvancedArmCapTextureOffsets";
 const SEGMENT_HEIGHT = 6;
 const TORSO_WIDTH = 8;
 const TORSO_DEPTH = 4;
@@ -41,6 +53,8 @@ const VOXEL_FACE_SHADING = [0.82, 0.82, 1.08, 0.68, 1, 0.9];
 
 type SegmentHalf = "top" | "bottom";
 
+type SegmentCapFace = "top" | "bottom";
+
 type FaceRect = readonly [number, number, number, number];
 
 type SkinBoxRegion = {
@@ -49,6 +63,13 @@ type SkinBoxRegion = {
   width: number;
   height: number;
   depth: number;
+};
+
+type SkinTextureRect = {
+  u: number;
+  v: number;
+  width: number;
+  height: number;
 };
 
 type TexturePixelSource = {
@@ -71,7 +92,20 @@ type VoxelSlabTransform = {
   outwardDirection: -1 | 1;
 };
 
+type ArmSegmentCapTextureRegions = {
+  upperBottom: {
+    inner: SkinTextureRect;
+    outer: SkinTextureRect;
+  };
+  lowerTop: {
+    inner: SkinTextureRect;
+    outer: SkinTextureRect;
+  };
+};
+
 type SegmentRig = {
+  armCapRegions: ArmSegmentCapTextureRegions | null;
+  innerRegion: SkinBoxRegion;
   joint: Group;
   lowerInnerMesh: Mesh;
   lowerOuterMesh: Mesh;
@@ -79,6 +113,7 @@ type SegmentRig = {
   originalInner: Object3D;
   originalOuter: Object3D;
   outerRegion: SkinBoxRegion;
+  outerWidth: number;
   root: Group;
   segmentOffsetX: number;
   upperInnerMesh: Mesh;
@@ -129,6 +164,8 @@ type SkinPartObject = Object3D & {
   innerLayer: Object3D;
   outerLayer: Object3D;
 };
+
+type HiddenSegmentCapFaces = Partial<Record<SegmentCapFace, true>>;
 
 function toRadians(value: number): number {
   return (value * Math.PI) / 180;
@@ -199,12 +236,77 @@ function setBoxFaceUvs(
   uvAttribute.needsUpdate = true;
 }
 
+function toFaceRect(region: SkinTextureRect): FaceRect {
+  return [region.u, region.v, region.u + region.width, region.v + region.height];
+}
+
+function getDefaultTopFaceRegion(skinRegion: SkinBoxRegion): SkinTextureRect {
+  return {
+    u: skinRegion.u + skinRegion.depth,
+    v: skinRegion.v,
+    width: skinRegion.width,
+    height: skinRegion.depth,
+  };
+}
+
+function getDefaultBottomFaceRegion(skinRegion: SkinBoxRegion): SkinTextureRect {
+  return {
+    u: skinRegion.u + skinRegion.width + skinRegion.depth,
+    v: skinRegion.v,
+    width: skinRegion.width,
+    height: skinRegion.depth,
+  };
+}
+
+function hideBoxCapFaces(geometry: BoxGeometry, hiddenCaps?: HiddenSegmentCapFaces): void {
+  if (!hiddenCaps?.top && !hiddenCaps?.bottom) {
+    return;
+  }
+
+  const indexAttribute = geometry.getIndex();
+
+  if (!(indexAttribute instanceof BufferAttribute)) {
+    return;
+  }
+
+  const hiddenFaceIndices = new Set<number>();
+
+  if (hiddenCaps.top) {
+    hiddenFaceIndices.add(2);
+  }
+
+  if (hiddenCaps.bottom) {
+    hiddenFaceIndices.add(3);
+  }
+
+  const sourceIndices = Array.from(indexAttribute.array as ArrayLike<number>);
+  const nextIndices: number[] = [];
+
+  for (let faceIndex = 0; faceIndex < 6; faceIndex += 1) {
+    if (hiddenFaceIndices.has(faceIndex)) {
+      continue;
+    }
+
+    const triangleStart = faceIndex * 6;
+
+    for (let indexOffset = 0; indexOffset < 6; indexOffset += 1) {
+      nextIndices.push(sourceIndices[triangleStart + indexOffset] ?? 0);
+    }
+  }
+
+  geometry.setIndex(nextIndices);
+  geometry.clearGroups();
+  geometry.addGroup(0, nextIndices.length, 0);
+}
+
 function createSegmentGeometry(
   width: number,
   height: number,
   depth: number,
   skinRegion: SkinBoxRegion,
   half: SegmentHalf,
+  capRegions?: Partial<Record<SegmentCapFace, SkinTextureRect>>,
+  hiddenCaps?: HiddenSegmentCapFaces,
 ): BoxGeometry {
   const geometry = new BoxGeometry(width, height, depth);
   const sideTop = skinRegion.v + skinRegion.depth;
@@ -212,6 +314,8 @@ function createSegmentGeometry(
   const sideMiddle = sideTop + skinRegion.height / 2;
   const faceTop = half === "top" ? sideTop : sideMiddle;
   const faceBottom = half === "top" ? sideMiddle : sideBottom;
+  const topRegion = capRegions?.top ?? getDefaultTopFaceRegion(skinRegion);
+  const bottomRegion = capRegions?.bottom ?? getDefaultBottomFaceRegion(skinRegion);
 
   setBoxFaceUvs(geometry, {
     right: [
@@ -226,18 +330,8 @@ function createSegmentGeometry(
       skinRegion.u + skinRegion.depth,
       faceBottom,
     ],
-    top: [
-      skinRegion.u + skinRegion.depth,
-      skinRegion.v,
-      skinRegion.u + skinRegion.width + skinRegion.depth,
-      skinRegion.v + skinRegion.depth,
-    ],
-    bottom: [
-      skinRegion.u + skinRegion.width + skinRegion.depth,
-      skinRegion.v,
-      skinRegion.u + skinRegion.width * 2 + skinRegion.depth,
-      skinRegion.v + skinRegion.depth,
-    ],
+    top: toFaceRect(topRegion),
+    bottom: toFaceRect(bottomRegion),
     front: [
       skinRegion.u + skinRegion.depth,
       faceTop,
@@ -251,6 +345,8 @@ function createSegmentGeometry(
       faceBottom,
     ],
   });
+
+  hideBoxCapFaces(geometry, hiddenCaps);
 
   return geometry;
 }
@@ -468,12 +564,16 @@ function createSegmentVoxelGeometry(
   half: SegmentHalf,
   pixelSource: TexturePixelSource,
   surfaceOffset: number,
+  capRegions?: Partial<Record<SegmentCapFace, SkinTextureRect>>,
+  hiddenCaps?: HiddenSegmentCapFaces,
 ): BufferGeometry | null {
   const sideTop = skinRegion.v + depth;
   const sideMiddle = sideTop + skinRegion.height / 2;
   const sideBottom = sideTop + skinRegion.height;
   const faceTop = half === "top" ? sideTop : sideMiddle;
   const faceBottom = half === "top" ? sideMiddle : sideBottom;
+  const topRegion = capRegions?.top ?? getDefaultTopFaceRegion(skinRegion);
+  const bottomRegion = capRegions?.bottom ?? getDefaultBottomFaceRegion(skinRegion);
   const positions: number[] = [];
   const normals: number[] = [];
   const colors: number[] = [];
@@ -584,25 +684,29 @@ function createSegmentVoxelGeometry(
     }),
   );
 
-  visitFaceTexels(
-    { u: skinRegion.u + depth, v: skinRegion.v, width, height: depth },
-    { axis: "y", outwardDirection: 1 },
-    (pixelX, pixelY) => ({
-      x: -width / 2 + 0.5 + pixelX,
-      y: height / 2 + surfaceOffset,
-      z: -depth / 2 + 0.5 + pixelY,
-    }),
-  );
+  if (!hiddenCaps?.top) {
+    visitFaceTexels(
+      topRegion,
+      { axis: "y", outwardDirection: 1 },
+      (pixelX, pixelY) => ({
+        x: -width / 2 + 0.5 + pixelX,
+        y: height / 2 + surfaceOffset,
+        z: -depth / 2 + 0.5 + pixelY,
+      }),
+    );
+  }
 
-  visitFaceTexels(
-    { u: skinRegion.u + width + depth, v: skinRegion.v, width, height: depth },
-    { axis: "y", outwardDirection: -1 },
-    (pixelX, pixelY) => ({
-      x: -width / 2 + 0.5 + pixelX,
-      y: -height / 2 - surfaceOffset,
-      z: depth / 2 - 0.5 - pixelY,
-    }),
-  );
+  if (!hiddenCaps?.bottom) {
+    visitFaceTexels(
+      bottomRegion,
+      { axis: "y", outwardDirection: -1 },
+      (pixelX, pixelY) => ({
+        x: -width / 2 + 0.5 + pixelX,
+        y: -height / 2 - surfaceOffset,
+        z: depth / 2 - 0.5 - pixelY,
+      }),
+    );
+  }
 
   if (positions.length === 0) {
     return null;
@@ -647,6 +751,40 @@ function disposeVoxelMesh(mesh: Mesh | null): void {
   }
 }
 
+function replaceMeshGeometry(mesh: Mesh, geometry: BufferGeometry): void {
+  const previousGeometry = mesh.geometry;
+
+  mesh.geometry = geometry;
+  previousGeometry.dispose();
+}
+
+function getStoredArmCapTextureOffsets(viewer: SkinViewer): AdvancedArmCapTextureOffsets {
+  const storedOffsets = viewer.playerObject.skin.userData[
+    ADVANCED_ARM_CAP_TEXTURE_OFFSETS_KEY
+  ] as AdvancedArmCapTextureOffsets | undefined;
+
+  return cloneAdvancedArmCapTextureOffsets(
+    storedOffsets ?? createDefaultAdvancedArmCapTextureOffsets(),
+  );
+}
+
+function buildArmSegmentCapTextureRegions(
+  armId: HeldItemArmId,
+  modelType: ArmModel,
+  offsets: AdvancedArmCapTextureOffsets,
+): ArmSegmentCapTextureRegions {
+  return {
+    upperBottom: {
+      inner: getArmCapTextureRegion(armId, "upperBottom", modelType, offsets),
+      outer: getArmCapTextureRegion(armId, "upperBottom", modelType, offsets, true),
+    },
+    lowerTop: {
+      inner: getArmCapTextureRegion(armId, "lowerTop", modelType, offsets),
+      outer: getArmCapTextureRegion(armId, "lowerTop", modelType, offsets, true),
+    },
+  };
+}
+
 function buildLimbRig(
   part: SkinPartObject,
   innerRegion: SkinBoxRegion,
@@ -654,31 +792,62 @@ function buildLimbRig(
   innerWidth: number,
   outerWidth: number,
   segmentOffsetX: number,
+  armCapRegions: ArmSegmentCapTextureRegions | null = null,
 ): SegmentRig {
   if (!isMesh(part.innerLayer) || !isMesh(part.outerLayer)) {
     throw new Error("Advanced avatar rig requires mesh-based limb layers.");
   }
 
   const upperInnerMesh = new Mesh(
-    createSegmentGeometry(innerWidth, SEGMENT_HEIGHT, LIMB_DEPTH, innerRegion, "top"),
+    createSegmentGeometry(
+      innerWidth,
+      SEGMENT_HEIGHT,
+      LIMB_DEPTH,
+      innerRegion,
+      "top",
+      armCapRegions ? { bottom: armCapRegions.upperBottom.inner } : undefined,
+    ),
     part.innerLayer.material,
   );
   upperInnerMesh.position.set(segmentOffsetX, -SEGMENT_HEIGHT / 2, 0);
 
   const lowerInnerMesh = new Mesh(
-    createSegmentGeometry(innerWidth, SEGMENT_HEIGHT, LIMB_DEPTH, innerRegion, "bottom"),
+    createSegmentGeometry(
+      innerWidth,
+      SEGMENT_HEIGHT,
+      LIMB_DEPTH,
+      innerRegion,
+      "bottom",
+      armCapRegions ? { top: armCapRegions.lowerTop.inner } : undefined,
+    ),
     part.innerLayer.material,
   );
   lowerInnerMesh.position.set(0, -SEGMENT_HEIGHT / 2, 0);
 
   const upperOuterMesh = new Mesh(
-    createSegmentGeometry(outerWidth, OUTER_SEGMENT_HEIGHT, OUTER_LIMB_DEPTH, outerRegion, "top"),
+    createSegmentGeometry(
+      outerWidth,
+      OUTER_SEGMENT_HEIGHT,
+      OUTER_LIMB_DEPTH,
+      outerRegion,
+      "top",
+      armCapRegions ? { bottom: armCapRegions.upperBottom.outer } : undefined,
+      armCapRegions ? { bottom: true } : undefined,
+    ),
     part.outerLayer.material,
   );
   upperOuterMesh.position.set(segmentOffsetX, -OUTER_SEGMENT_HEIGHT / 2, 0);
 
   const lowerOuterMesh = new Mesh(
-    createSegmentGeometry(outerWidth, OUTER_SEGMENT_HEIGHT, OUTER_LIMB_DEPTH, outerRegion, "bottom"),
+    createSegmentGeometry(
+      outerWidth,
+      OUTER_SEGMENT_HEIGHT,
+      OUTER_LIMB_DEPTH,
+      outerRegion,
+      "bottom",
+      armCapRegions ? { top: armCapRegions.lowerTop.outer } : undefined,
+      armCapRegions ? { top: true } : undefined,
+    ),
     part.outerLayer.material,
   );
   lowerOuterMesh.position.set(0, -OUTER_SEGMENT_HEIGHT / 2, 0);
@@ -694,6 +863,8 @@ function buildLimbRig(
   part.add(root);
 
   return {
+    armCapRegions,
+    innerRegion,
     joint,
     lowerInnerMesh,
     lowerOuterMesh,
@@ -701,6 +872,7 @@ function buildLimbRig(
     originalInner: part.innerLayer,
     originalOuter: part.outerLayer,
     outerRegion,
+    outerWidth,
     root,
     segmentOffsetX,
     upperInnerMesh,
@@ -791,6 +963,60 @@ function disposeTorsoRig(rig: TorsoRig): void {
   rig.root.removeFromParent();
 }
 
+function refreshSegmentRigGeometry(rig: SegmentRig): void {
+  replaceMeshGeometry(
+    rig.upperInnerMesh,
+    createSegmentGeometry(
+      rig.voxelWidth,
+      SEGMENT_HEIGHT,
+      LIMB_DEPTH,
+      rig.innerRegion,
+      "top",
+      rig.armCapRegions ? { bottom: rig.armCapRegions.upperBottom.inner } : undefined,
+    ),
+  );
+  replaceMeshGeometry(
+    rig.lowerInnerMesh,
+    createSegmentGeometry(
+      rig.voxelWidth,
+      SEGMENT_HEIGHT,
+      LIMB_DEPTH,
+      rig.innerRegion,
+      "bottom",
+      rig.armCapRegions ? { top: rig.armCapRegions.lowerTop.inner } : undefined,
+    ),
+  );
+  replaceMeshGeometry(
+    rig.upperOuterMesh,
+    createSegmentGeometry(
+      rig.outerWidth,
+      OUTER_SEGMENT_HEIGHT,
+      OUTER_LIMB_DEPTH,
+      rig.outerRegion,
+      "top",
+      rig.armCapRegions ? { bottom: rig.armCapRegions.upperBottom.outer } : undefined,
+      rig.armCapRegions ? { bottom: true } : undefined,
+    ),
+  );
+  replaceMeshGeometry(
+    rig.lowerOuterMesh,
+    createSegmentGeometry(
+      rig.outerWidth,
+      OUTER_SEGMENT_HEIGHT,
+      OUTER_LIMB_DEPTH,
+      rig.outerRegion,
+      "bottom",
+      rig.armCapRegions ? { top: rig.armCapRegions.lowerTop.outer } : undefined,
+      rig.armCapRegions ? { top: true } : undefined,
+    ),
+  );
+
+  disposeVoxelMesh(rig.upperVoxelMesh);
+  disposeVoxelMesh(rig.lowerVoxelMesh);
+  rig.upperVoxelMesh = null;
+  rig.lowerVoxelMesh = null;
+}
+
 function getStoredAdvancedRig(viewer: SkinViewer): AdvancedRigState | null {
   return (viewer.playerObject.skin.userData[ADVANCED_RIG_STATE_KEY] as AdvancedRigState | undefined) ?? null;
 }
@@ -867,6 +1093,7 @@ function destroyAdvancedRig(viewer: SkinViewer, state: AdvancedRigState): void {
 function buildAdvancedRig(viewer: SkinViewer): AdvancedRigState {
   const skin = viewer.playerObject.skin;
   const modelType = skin.modelType as ArmModel;
+  const armCapTextureOffsets = getStoredArmCapTextureOffsets(viewer);
   const innerArmWidth = modelType === "slim" ? INNER_SLIM_ARM_WIDTH : INNER_LIMB_WIDTH;
   const outerArmWidth = modelType === "slim" ? OUTER_SLIM_ARM_WIDTH : OUTER_LIMB_WIDTH;
   const leftArmOffsetX = modelType === "slim" ? 0.5 : 1;
@@ -886,6 +1113,7 @@ function buildAdvancedRig(viewer: SkinViewer): AdvancedRigState {
       innerArmWidth,
       outerArmWidth,
       leftArmOffsetX,
+      buildArmSegmentCapTextureRegions("leftArm", modelType, armCapTextureOffsets),
     ),
     leftLegRig: buildLimbRig(
       skin.leftLeg as SkinPartObject,
@@ -905,6 +1133,7 @@ function buildAdvancedRig(viewer: SkinViewer): AdvancedRigState {
       innerArmWidth,
       outerArmWidth,
       rightArmOffsetX,
+      buildArmSegmentCapTextureRegions("rightArm", modelType, armCapTextureOffsets),
     ),
     rightLegRig: buildLimbRig(
       skin.rightLeg as SkinPartObject,
@@ -987,6 +1216,8 @@ function ensureSegmentVoxelMeshes(
       "top",
       pixelSource,
       rig.voxelSurfaceOffset,
+      rig.armCapRegions ? { bottom: rig.armCapRegions.upperBottom.outer } : undefined,
+      rig.armCapRegions ? { bottom: true } : undefined,
     );
 
     if (upperGeometry) {
@@ -1007,6 +1238,8 @@ function ensureSegmentVoxelMeshes(
       "bottom",
       pixelSource,
       rig.voxelSurfaceOffset,
+      rig.armCapRegions ? { top: rig.armCapRegions.lowerTop.outer } : undefined,
+      rig.armCapRegions ? { top: true } : undefined,
     );
 
     if (lowerGeometry) {
@@ -1214,6 +1447,29 @@ export function syncAdvancedAvatarRig(viewer: SkinViewer, isAdvanced: boolean): 
   skin.head.position.set(0, 6, 0);
   skin.leftArm.position.set(5, 6, 0);
   skin.rightArm.position.set(-5, 6, 0);
+}
+
+export function setAdvancedArmCapTextureOffsets(
+  viewer: SkinViewer,
+  offsets: AdvancedArmCapTextureOffsets,
+): void {
+  const nextOffsets = cloneAdvancedArmCapTextureOffsets(offsets);
+
+  viewer.playerObject.skin.userData[ADVANCED_ARM_CAP_TEXTURE_OFFSETS_KEY] = nextOffsets;
+
+  const state = getStoredAdvancedRig(viewer);
+
+  if (!state) {
+    return;
+  }
+
+  const modelType = viewer.playerObject.skin.modelType as ArmModel;
+
+  state.leftArmRig.armCapRegions = buildArmSegmentCapTextureRegions("leftArm", modelType, nextOffsets);
+  state.rightArmRig.armCapRegions = buildArmSegmentCapTextureRegions("rightArm", modelType, nextOffsets);
+
+  refreshSegmentRigGeometry(state.leftArmRig);
+  refreshSegmentRigGeometry(state.rightArmRig);
 }
 
 export function applyAdvancedAvatarPose(viewer: SkinViewer, pose: PoseState): boolean {

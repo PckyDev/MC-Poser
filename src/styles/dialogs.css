@@ -417,6 +417,110 @@
   line-height: 1.5;
 }
 
+.arm-cap-map-modal {
+  width: min(960px, 100%);
+}
+
+.arm-cap-map-modal-body {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.18fr) minmax(18rem, 0.82fr);
+  gap: 1rem;
+  padding: 1rem 1.1rem 1.1rem;
+}
+
+.arm-cap-map-preview-panel,
+.arm-cap-map-meta,
+.arm-cap-map-actions {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.arm-cap-map-sidebar {
+  display: grid;
+  gap: 0.7rem;
+  align-content: start;
+  align-self: start;
+}
+
+.arm-cap-map-stage {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    rgba(0, 0, 0, 0.14);
+  background-size: calc(100% / 8) calc(100% / 8), calc(100% / 8) calc(100% / 8), auto;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.arm-cap-map-image,
+.arm-cap-map-grid,
+.arm-cap-map-default-region,
+.arm-cap-map-selection {
+  position: absolute;
+}
+
+.arm-cap-map-image,
+.arm-cap-map-grid {
+  inset: 0;
+}
+
+.arm-cap-map-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+
+.arm-cap-map-grid {
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size:
+    calc(100% / 64) calc(100% / 64),
+    calc(100% / 64) calc(100% / 64);
+}
+
+.arm-cap-map-default-region,
+.arm-cap-map-selection {
+  pointer-events: none;
+}
+
+.arm-cap-map-default-region {
+  border: 1px dashed rgba(255, 255, 255, 0.72);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.36);
+}
+
+.arm-cap-map-selection {
+  border: 1px solid rgba(240, 142, 58, 0.92);
+  background: rgba(240, 142, 58, 0.14);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(240, 142, 58, 0.28);
+}
+
+.arm-cap-map-coordinate-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.arm-cap-map-coordinate-field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.arm-cap-map-actions {
+  gap: 0.65rem;
+  align-content: start;
+}
+
 .new-file-upload-actions {
   display: flex;
   gap: 0.65rem;

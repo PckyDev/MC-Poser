@@ -318,6 +318,22 @@
   gap: 0.45rem;
 }
 
+.arm-cap-settings {
+  display: grid;
+  gap: 0.6rem;
+  padding-top: 0.15rem;
+}
+
+.arm-cap-settings-note {
+  font-size: 0.8rem;
+}
+
+.arm-cap-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
 .slider-header {
   display: flex;
   justify-content: space-between;

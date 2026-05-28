@@ -33,6 +33,7 @@ import {
 import { DocumentModal } from "./components/editor/DocumentModal";
 import { DocumentTabBar } from "./components/editor/DocumentTabBar";
 import { EditorTopbar } from "./components/editor/EditorTopbar";
+import { ArmCapTextureModal } from "./components/editor/ArmCapTextureModal";
 import {
   ExportModal,
   type ExportBackgroundMode,
@@ -62,6 +63,9 @@ import {
 } from "./config/pose";
 import type {
   ArmModel,
+  AdvancedArmCapTextureOffsets,
+  ArmCapTextureOffset,
+  ArmCapTextureTarget,
   AvatarType,
   HeldItemAdjustments,
   HeldItem,
@@ -95,8 +99,15 @@ import {
   getAdvancedAvatarHandAnchor,
   getAdvancedAvatarOutlineObjects,
   isAdvancedAvatarActive,
+  setAdvancedArmCapTextureOffsets,
   setAdvancedAvatarOuterLayerVisibility,
 } from "./utils/avatarRig";
+import {
+  applyArmCapTextureOffset,
+  cloneAdvancedArmCapTextureOffsets,
+  createDefaultAdvancedArmCapTextureOffsets,
+  getArmCapTextureTargetLabel,
+} from "./utils/armCapTextureMap";
 import {
   HELD_ITEM_ARM_IDS,
   EMPTY_HELD_ITEMS,
@@ -118,6 +129,7 @@ type WorkspaceDocument = {
   id: string;
   poseFileName: string;
   fileHandle: WorkspaceFileHandle | null;
+  advancedArmCapTextureOffsets: AdvancedArmCapTextureOffsets;
   heldItems: HeldItemsState;
   pose: PoseState;
   selectedPoseSelection: PoseSelection;
@@ -134,6 +146,7 @@ type WorkspaceDocument = {
 type ImportedWorkspaceFile = {
   version?: unknown;
   poseFileName?: unknown;
+  advancedArmCapTextureOffsets?: unknown;
   pose?: unknown;
   heldItems?: unknown;
   skin?: unknown;
@@ -150,6 +163,7 @@ type ImportedWorkspaceFile = {
 type SerializableWorkspaceFile = {
   version: 2;
   poseFileName: string;
+  advancedArmCapTextureOffsets: AdvancedArmCapTextureOffsets;
   pose: PoseState;
   heldItems: HeldItemsState;
   skin: LoadedSkin | null;
@@ -1054,6 +1068,41 @@ function normalizeImportedHeldItems(rawHeldItems: unknown): HeldItemsState {
   };
 }
 
+function normalizeImportedArmCapTextureOffset(rawOffset: unknown): ArmCapTextureOffset {
+  if (!isObjectRecord(rawOffset)) {
+    return { u: 0, v: 0 };
+  }
+
+  return {
+    u: typeof rawOffset.u === "number" && Number.isFinite(rawOffset.u) ? Math.round(rawOffset.u) : 0,
+    v: typeof rawOffset.v === "number" && Number.isFinite(rawOffset.v) ? Math.round(rawOffset.v) : 0,
+  };
+}
+
+function normalizeImportedAdvancedArmCapTextureOffsets(
+  rawOffsets: unknown,
+): AdvancedArmCapTextureOffsets {
+  const nextOffsets = createDefaultAdvancedArmCapTextureOffsets();
+
+  if (!isObjectRecord(rawOffsets)) {
+    return nextOffsets;
+  }
+
+  const leftArmOffsets = isObjectRecord(rawOffsets.leftArm) ? rawOffsets.leftArm : null;
+  const rightArmOffsets = isObjectRecord(rawOffsets.rightArm) ? rawOffsets.rightArm : null;
+
+  return {
+    leftArm: {
+      upperBottom: normalizeImportedArmCapTextureOffset(leftArmOffsets?.upperBottom),
+      lowerTop: normalizeImportedArmCapTextureOffset(leftArmOffsets?.lowerTop),
+    },
+    rightArm: {
+      upperBottom: normalizeImportedArmCapTextureOffset(rightArmOffsets?.upperBottom),
+      lowerTop: normalizeImportedArmCapTextureOffset(rightArmOffsets?.lowerTop),
+    },
+  };
+}
+
 function normalizeImportedPose(rawPose: unknown): PoseState {
   const nextPose = clonePose(NEUTRAL_POSE);
 
@@ -1232,6 +1281,35 @@ function getTexturePixelSource(texture: Texture | null): TexturePixelSource | nu
     width: canvas.width,
     height: canvas.height,
   };
+}
+
+function getTexturePreviewDataUrl(texture: Texture | null): string | null {
+  const image = texture?.image as (CanvasImageSource & {
+    width?: number;
+    height?: number;
+  }) | null;
+
+  if (!image || typeof image.width !== "number" || typeof image.height !== "number") {
+    return null;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = image.width;
+  canvas.height = image.height;
+
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    return null;
+  }
+
+  try {
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/png");
+  } catch {
+    return null;
+  }
 }
 
 function sampleTexturePixel(
@@ -2219,6 +2297,9 @@ function createWorkspaceDocument(
     id: globalThis.crypto?.randomUUID?.() ?? `doc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     poseFileName: normalizePoseFileName(rawName),
     fileHandle: overrides.fileHandle ?? null,
+    advancedArmCapTextureOffsets: cloneAdvancedArmCapTextureOffsets(
+      overrides.advancedArmCapTextureOffsets ?? createDefaultAdvancedArmCapTextureOffsets(),
+    ),
     heldItems: cloneHeldItems(overrides.heldItems),
     pose: clonePose(overrides.pose ?? NEUTRAL_POSE),
     selectedPoseSelection: overrides.selectedPoseSelection ?? DEFAULT_POSE_SELECTION,
@@ -2280,6 +2361,10 @@ export default function App() {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [helpContactModalKind, setHelpContactModalKind] = useState<HelpContactModalKind | null>(null);
   const [heldItemModalArmId, setHeldItemModalArmId] = useState<HeldItemArmId | null>(null);
+  const [armCapTextureModalState, setArmCapTextureModalState] = useState<{
+    armId: HeldItemArmId;
+    target: ArmCapTextureTarget;
+  } | null>(null);
   const [isStartupModalOpen, setIsStartupModalOpen] = useState(true);
   const [isNewFileModalOpen, setIsNewFileModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -2304,11 +2389,13 @@ export default function App() {
   const [hasEnteredWorkspace, setHasEnteredWorkspace] = useState(false);
   const [viewportLightingMode, setViewportLightingMode] =
     useState<ViewportLightingMode>("unlit");
+  const [viewerSkinPreviewUrl, setViewerSkinPreviewUrl] = useState<string | null>(null);
   const viewportLightingModeRef = useRef<ViewportLightingMode>("unlit");
 
   const activeDocument = documents.find((document) => document.id === activeDocumentId) ?? documents[0]!;
   const {
     poseFileName,
+    advancedArmCapTextureOffsets,
     pose,
     heldItems,
     selectedPoseSelection,
@@ -2348,7 +2435,8 @@ export default function App() {
   }, [viewportLightingMode]);
   useEffect(() => {
     closeHeldItemModal();
-  }, [activeDocumentId]);
+    closeArmCapTextureModal();
+  }, [activeDocumentId, skin?.source]);
 
   useEffect(() => {
     const activeSkinLabel = skin?.label?.trim() ?? "";
@@ -3058,6 +3146,9 @@ export default function App() {
     return {
       version: 2,
       poseFileName: overridePoseFileName,
+      advancedArmCapTextureOffsets: cloneAdvancedArmCapTextureOffsets(
+        documentToSerialize.advancedArmCapTextureOffsets,
+      ),
       heldItems: await serializeWorkspaceHeldItems(documentToSerialize.heldItems),
       pose: clonePose(documentToSerialize.pose),
       skin: await serializeWorkspaceSkin(documentToSerialize.skin),
@@ -3713,6 +3804,21 @@ export default function App() {
     setHeldItemModalArmId(armId);
   }
 
+  function closeArmCapTextureModal(): void {
+    setArmCapTextureModalState(null);
+  }
+
+  function openArmCapTextureModal(
+    armId: HeldItemArmId,
+    target: ArmCapTextureTarget,
+  ): void {
+    if (!skin || !resolvedModel) {
+      return;
+    }
+
+    setArmCapTextureModalState({ armId, target });
+  }
+
   function openIdeasModal(): void {
     setHelpContactModalKind("ideas");
   }
@@ -4170,6 +4276,21 @@ export default function App() {
   }, [showOuterLayer, showOuterLayerIn3d, resolvedModel, viewportLightingMode]);
 
   useEffect(() => {
+    const viewer = viewerRef.current;
+
+    if (!viewer || !skin || !resolvedModel) {
+      return;
+    }
+
+    setAdvancedArmCapTextureOffsets(viewer, advancedArmCapTextureOffsets);
+    applyOuterLayerPresentation(viewer, showOuterLayer, showOuterLayerIn3d);
+    syncSelectedOutline();
+    syncRotationGizmo();
+    viewer.render();
+    publishDebugState(viewer);
+  }, [advancedArmCapTextureOffsets, resolvedModel, skin]);
+
+  useEffect(() => {
     if (skin?.origin !== "upload") {
       return;
     }
@@ -4201,11 +4322,13 @@ export default function App() {
         disposeOuterLayerVoxelMeshes();
         disposeViewerViewportMaterialVariants(viewer);
         viewer.loadSkin(null);
+        setViewerSkinPreviewUrl(null);
         applyViewportLighting(viewer, viewportLightingModeRef.current);
         viewer.render();
         publishDebugState(viewer);
       }
 
+      setViewerSkinPreviewUrl(null);
       return;
     }
 
@@ -4226,6 +4349,8 @@ export default function App() {
           return;
         }
 
+        setViewerSkinPreviewUrl(getTexturePreviewDataUrl(viewer.playerObject.skin.map));
+        setAdvancedArmCapTextureOffsets(viewer, advancedArmCapTextureOffsets);
         setViewerInnerLayerVisible(viewer, true);
         applyAvatarType(viewer, avatarType);
         rebuildOuterLayerVoxelMeshes(viewer);
@@ -4249,6 +4374,7 @@ export default function App() {
           return;
         }
 
+        setViewerSkinPreviewUrl(null);
         setError(
           loadError instanceof Error
             ? loadError.message
@@ -4673,6 +4799,9 @@ export default function App() {
         ? parsedFile.poseFileName
         : fallbackFileName,
       {
+        advancedArmCapTextureOffsets: normalizeImportedAdvancedArmCapTextureOffsets(
+          parsedFile.advancedArmCapTextureOffsets,
+        ),
         heldItems: normalizeImportedHeldItems(parsedFile.heldItems),
         pose: normalizeImportedPose(parsedFile.pose),
         skin: importedSkin,
@@ -5392,11 +5521,13 @@ export default function App() {
         <RightSidebar
           avatarType={avatarType}
           heldItems={heldItems}
+          isArmCapTextureMapAvailable={Boolean(skin && resolvedModel)}
           selectedSelection={selectedPoseSelection}
           pose={pose}
           showOuterLayer={showOuterLayer}
           showOuterLayerIn3d={showOuterLayerIn3d}
           showHeldItems={showHeldItems}
+          onOpenArmCapTextureModal={openArmCapTextureModal}
           onOpenHeldItemModal={openHeldItemModal}
           onRemoveHeldItem={removeHeldItemFromArm}
           onResetHeldItemAdjustments={resetHeldItemAdjustments}
@@ -5527,6 +5658,31 @@ export default function App() {
         onClose={closeHeldItemModal}
         onSelectPreset={handleHeldItemPresetSelect}
         onSelectUpload={handleHeldItemUploadSelect}
+      />
+
+      <ArmCapTextureModal
+        armId={armCapTextureModalState?.armId ?? null}
+        currentOffsets={advancedArmCapTextureOffsets}
+        isOpen={armCapTextureModalState !== null}
+        modelType={resolvedModel ?? "default"}
+        skinSource={viewerSkinPreviewUrl ?? skin?.source ?? null}
+        target={armCapTextureModalState?.target ?? null}
+        onClose={closeArmCapTextureModal}
+        onSave={(armId, target, offset) => {
+          updateDocument(activeDocumentId, (document) => ({
+            ...document,
+            advancedArmCapTextureOffsets: applyArmCapTextureOffset(
+              document.advancedArmCapTextureOffsets,
+              armId,
+              target,
+              offset,
+            ),
+          }));
+          closeArmCapTextureModal();
+          setStatus(
+            `Updated ${formatHeldItemArmLabel(armId).toLowerCase()} ${getArmCapTextureTargetLabel(target).toLowerCase()} mapping.`,
+          );
+        }}
       />
 
       <StartupModal

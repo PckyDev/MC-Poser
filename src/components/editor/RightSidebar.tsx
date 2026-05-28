@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { getPoseBones } from "../../config/pose";
 import type {
+  ArmCapTextureTarget,
   AvatarType,
   HeldItemAdjustments,
   HeldItem,
@@ -10,6 +11,10 @@ import type {
   PoseSelection,
   PoseState,
 } from "../../types/editor";
+import {
+  ARM_CAP_TEXTURE_TARGETS,
+  getArmCapTextureTargetLabel,
+} from "../../utils/armCapTextureMap";
 import {
   areHeldItemAdjustmentsDefault,
   formatHeldItemArmLabel,
@@ -80,11 +85,13 @@ function formatHeldItemAdjustmentValue(field: HeldItemAdjustmentField, value: nu
 type RightSidebarProps = {
   avatarType: AvatarType;
   heldItems: HeldItemsState;
+  isArmCapTextureMapAvailable: boolean;
   selectedSelection: PoseSelection;
   pose: PoseState;
   showOuterLayer: boolean;
   showOuterLayerIn3d: boolean;
   showHeldItems: boolean;
+  onOpenArmCapTextureModal: (armId: HeldItemArmId, target: ArmCapTextureTarget) => void;
   onOpenHeldItemModal: (armId: HeldItemArmId) => void;
   onRemoveHeldItem: (armId: HeldItemArmId) => void;
   onResetHeldItemAdjustments: (armId: HeldItemArmId) => void;
@@ -98,11 +105,13 @@ type RightSidebarProps = {
 export function RightSidebar({
   avatarType,
   heldItems,
+  isArmCapTextureMapAvailable,
   selectedSelection,
   pose,
   showOuterLayer,
   showOuterLayerIn3d,
   showHeldItems,
+  onOpenArmCapTextureModal,
   onOpenHeldItemModal,
   onRemoveHeldItem,
   onResetHeldItemAdjustments,
@@ -358,6 +367,30 @@ export function RightSidebar({
     );
   }
 
+  function renderArmCapTextureControls(targetArmId: HeldItemArmId) {
+    return (
+      <div className="arm-cap-settings">
+        <p className="panel-note arm-cap-settings-note">
+          Adjust the sampled skin area for the split elbow caps. The elbow cap renders on the base layer only.
+        </p>
+
+        <div className="arm-cap-settings-actions">
+          {ARM_CAP_TEXTURE_TARGETS.map((target) => (
+            <button
+              key={target}
+              className="toolbar-button"
+              type="button"
+              disabled={!isArmCapTextureMapAvailable}
+              onClick={() => onOpenArmCapTextureModal(targetArmId, target)}
+            >
+              {getArmCapTextureTargetLabel(target)}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <aside className="editor-sidebar editor-sidebar--right">
       <section className="editor-panel editor-panel--stretch">
@@ -415,6 +448,14 @@ export function RightSidebar({
                     value={pose[field.key]}
                     onChange={(event) => onUpdatePose(field.key, Number(event.target.value))}
                   />
+
+                  {avatarType === "advanced" && field.key === "leftElbowPitch"
+                    ? renderArmCapTextureControls("leftArm")
+                    : null}
+
+                  {avatarType === "advanced" && field.key === "rightElbowPitch"
+                    ? renderArmCapTextureControls("rightArm")
+                    : null}
                 </div>
               ))}
             </div>
