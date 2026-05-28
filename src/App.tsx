@@ -1313,7 +1313,7 @@ function getTexturePreviewDataUrl(texture: Texture | null): string | null {
   }
 }
 
-function rotateBoxFaceUvs180(geometry: BufferGeometry, faceIndex: number): void {
+function setBoxFaceBottomUvs(geometry: BufferGeometry, faceIndex: number, rotate180: boolean): void {
   const uvAttribute = geometry.getAttribute("uv");
 
   if (!(uvAttribute instanceof BufferAttribute)) {
@@ -1330,35 +1330,44 @@ function rotateBoxFaceUvs180(geometry: BufferGeometry, faceIndex: number): void 
     return;
   }
 
-  const rotatedFaceUvs: number[] = [
-    currentFaceUvs[6] ?? 0,
-    currentFaceUvs[7] ?? 0,
-    currentFaceUvs[4] ?? 0,
-    currentFaceUvs[5] ?? 0,
-    currentFaceUvs[2] ?? 0,
-    currentFaceUvs[3] ?? 0,
+  const uValues = [
     currentFaceUvs[0] ?? 0,
+    currentFaceUvs[2] ?? 0,
+    currentFaceUvs[4] ?? 0,
+    currentFaceUvs[6] ?? 0,
+  ];
+  const vValues = [
     currentFaceUvs[1] ?? 0,
+    currentFaceUvs[3] ?? 0,
+    currentFaceUvs[5] ?? 0,
+    currentFaceUvs[7] ?? 0,
   ];
 
-  uvAttribute.array.set(rotatedFaceUvs, faceStart);
+  const uMin = Math.min(...uValues);
+  const uMax = Math.max(...uValues);
+  const vMin = Math.min(...vValues);
+  const vMax = Math.max(...vValues);
+
+  const nextFaceUvs: number[] = rotate180
+    ? [uMax, vMax, uMin, vMax, uMax, vMin, uMin, vMin]
+    : [uMin, vMin, uMax, vMin, uMin, vMax, uMax, vMax];
+
+  uvAttribute.array.set(nextFaceUvs, faceStart);
   uvAttribute.needsUpdate = true;
 }
 
 function applyClassicHeadBottomUvFix(viewer: SkinViewer): void {
-  if (viewer.playerObject.skin.modelType !== "default") {
-    return;
-  }
+  const shouldRotate = viewer.playerObject.skin.modelType === "default";
 
   const headInnerLayer = viewer.playerObject.skin.head.innerLayer;
   const headOuterLayer = viewer.playerObject.skin.head.outerLayer;
 
   if (headInnerLayer instanceof Mesh) {
-    rotateBoxFaceUvs180(headInnerLayer.geometry, 3);
+    setBoxFaceBottomUvs(headInnerLayer.geometry, 3, shouldRotate);
   }
 
   if (headOuterLayer instanceof Mesh) {
-    rotateBoxFaceUvs180(headOuterLayer.geometry, 3);
+    setBoxFaceBottomUvs(headOuterLayer.geometry, 3, shouldRotate);
   }
 }
 
