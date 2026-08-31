@@ -15,6 +15,7 @@ from pathlib import Path
 
 APP_URL = "https://mcposer.pcky.dev"
 REPOSITORY_URL = "https://github.com/PckyDev/MC-Poser"
+BRAND_ICON_URL = "https://raw.githubusercontent.com/PckyDev/MC-Poser/main/brand/icon.jpg"
 
 
 def event_payload() -> dict:
@@ -66,6 +67,7 @@ def main() -> None:
     description = changelog(commit_messages(event))
     payload = {
         "username": "MC Poser Updates",
+        "avatar_url": BRAND_ICON_URL,
         "content": "A new **MC Poser** update has been published!",
         "allowed_mentions": {"parse": []},
         "embeds": [
