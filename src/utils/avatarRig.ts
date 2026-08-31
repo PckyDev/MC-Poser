@@ -533,6 +533,7 @@ function createVoxelGeometryFromSkinBox(
     }),
   );
 
+  // BoxGeometry's bottom UVs run texture rows from back to front.
   visitFaceTexels(
     { u: skinRegion.u + width + depth, v: skinRegion.v, width, height: depth },
     { axis: "y", outwardDirection: -1 },
@@ -542,8 +543,8 @@ function createVoxelGeometryFromSkinBox(
         : -width / 2 + 0.5 + pixelX,
       y: -height / 2 - surfaceOffset,
       z: rotateBottomFace180
-        ? -depth / 2 + 0.5 + pixelY
-        : depth / 2 - 0.5 - pixelY,
+        ? depth / 2 - 0.5 - pixelY
+        : -depth / 2 + 0.5 + pixelY,
     }),
   );
 
