@@ -1,0 +1,37 @@
+name: Publish site update to Discord
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: discord-site-update-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check webhook configuration
+        id: webhook
+        shell: bash
+        run: |
+          if [[ -n "$DISCORD_WEBHOOK_URL" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Add the DISCORD_WEBHOOK_URL repository secret to enable Discord updates."
+          fi
+      - name: Send update changelog
+        if: steps.webhook.outputs.configured == 'true'
+        run: python3 .github/scripts/publish_discord_update.py
