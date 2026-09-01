@@ -118,44 +118,46 @@ export type PosePresetName = keyof typeof POSE_PRESETS;
 
 export const PRESET_NAMES = Object.keys(POSE_PRESETS) as PosePresetName[];
 
+const FULL_ROTATION_RANGE = { min: -180, max: 180 } as const;
+
 const HEAD_FIELDS: PoseFieldConfig[] = [
-  { key: "headPitch", label: "Head pitch", min: -80, max: 80 },
-  { key: "headYaw", label: "Head yaw", min: -90, max: 90 },
-  { key: "headRoll", label: "Head roll", min: -70, max: 70 },
+  { key: "headPitch", label: "Head pitch", ...FULL_ROTATION_RANGE },
+  { key: "headYaw", label: "Head yaw", ...FULL_ROTATION_RANGE },
+  { key: "headRoll", label: "Head roll", ...FULL_ROTATION_RANGE },
 ];
 
 const TORSO_FIELDS: PoseFieldConfig[] = [
-  { key: "bodyPitch", label: "Body pitch", min: -70, max: 70 },
-  { key: "bodyYaw", label: "Body yaw", min: -50, max: 50 },
-  { key: "spineBend", label: "Spine bend", min: -70, max: 70 },
+  { key: "bodyPitch", label: "Body pitch", ...FULL_ROTATION_RANGE },
+  { key: "bodyYaw", label: "Body yaw", ...FULL_ROTATION_RANGE },
+  { key: "spineBend", label: "Spine bend", ...FULL_ROTATION_RANGE },
 ];
 
 const LEFT_ARM_FIELDS: PoseFieldConfig[] = [
-  { key: "leftArmPitch", label: "Left arm pitch", min: -140, max: 140 },
-  { key: "leftArmYaw", label: "Left arm yaw", min: -90, max: 90 },
-  { key: "leftArmRoll", label: "Left arm roll", min: -90, max: 90 },
-  { key: "leftElbowPitch", label: "Left elbow bend", min: 0, max: 150 },
+  { key: "leftArmPitch", label: "Left arm pitch", ...FULL_ROTATION_RANGE },
+  { key: "leftArmYaw", label: "Left arm yaw", ...FULL_ROTATION_RANGE },
+  { key: "leftArmRoll", label: "Left arm roll", ...FULL_ROTATION_RANGE },
+  { key: "leftElbowPitch", label: "Left elbow bend", ...FULL_ROTATION_RANGE },
 ];
 
 const RIGHT_ARM_FIELDS: PoseFieldConfig[] = [
-  { key: "rightArmPitch", label: "Right arm pitch", min: -140, max: 140 },
-  { key: "rightArmYaw", label: "Right arm yaw", min: -90, max: 90 },
-  { key: "rightArmRoll", label: "Right arm roll", min: -90, max: 90 },
-  { key: "rightElbowPitch", label: "Right elbow bend", min: 0, max: 150 },
+  { key: "rightArmPitch", label: "Right arm pitch", ...FULL_ROTATION_RANGE },
+  { key: "rightArmYaw", label: "Right arm yaw", ...FULL_ROTATION_RANGE },
+  { key: "rightArmRoll", label: "Right arm roll", ...FULL_ROTATION_RANGE },
+  { key: "rightElbowPitch", label: "Right elbow bend", ...FULL_ROTATION_RANGE },
 ];
 
 const LEFT_LEG_FIELDS: PoseFieldConfig[] = [
-  { key: "leftLegPitch", label: "Left leg pitch", min: -90, max: 90 },
-  { key: "leftLegYaw", label: "Left leg yaw", min: -40, max: 40 },
-  { key: "leftLegRoll", label: "Left leg roll", min: -30, max: 30 },
-  { key: "leftKneePitch", label: "Left knee bend", min: 0, max: 150 },
+  { key: "leftLegPitch", label: "Left leg pitch", ...FULL_ROTATION_RANGE },
+  { key: "leftLegYaw", label: "Left leg yaw", ...FULL_ROTATION_RANGE },
+  { key: "leftLegRoll", label: "Left leg roll", ...FULL_ROTATION_RANGE },
+  { key: "leftKneePitch", label: "Left knee bend", ...FULL_ROTATION_RANGE },
 ];
 
 const RIGHT_LEG_FIELDS: PoseFieldConfig[] = [
-  { key: "rightLegPitch", label: "Right leg pitch", min: -90, max: 90 },
-  { key: "rightLegYaw", label: "Right leg yaw", min: -40, max: 40 },
-  { key: "rightLegRoll", label: "Right leg roll", min: -30, max: 30 },
-  { key: "rightKneePitch", label: "Right knee bend", min: 0, max: 150 },
+  { key: "rightLegPitch", label: "Right leg pitch", ...FULL_ROTATION_RANGE },
+  { key: "rightLegYaw", label: "Right leg yaw", ...FULL_ROTATION_RANGE },
+  { key: "rightLegRoll", label: "Right leg roll", ...FULL_ROTATION_RANGE },
+  { key: "rightKneePitch", label: "Right knee bend", ...FULL_ROTATION_RANGE },
 ];
 
 const BASIC_TORSO_FIELDS = TORSO_FIELDS.filter((field) => field.key !== "spineBend");
