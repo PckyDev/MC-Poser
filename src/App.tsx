@@ -211,7 +211,7 @@ const DEFAULT_SEO_TITLE = "MC Poser | Pose Minecraft skins in 3D";
 const DEFAULT_SEO_DESCRIPTION =
   "Browser-based Minecraft skin pose editor with 3D controls, image export, and compact share links.";
 
-type SharedSelectionPayload = readonly [0 | 1 | 2, number];
+type SharedSelectionPayload = readonly [0 | 1 | 2 | 3, number];
 
 type SharedSkinPayload = readonly [
   string,
@@ -1135,6 +1135,10 @@ function normalizeImportedSelection(rawSelection: unknown): PoseSelection {
     };
   }
 
+  if (rawSelection.kind === "none") {
+    return { kind: "none" };
+  }
+
   if (rawSelection.kind === "joint" && isPoseKey(rawSelection.id)) {
     return {
       kind: "joint",
@@ -1714,6 +1718,10 @@ function heldItemSourceKindFromShareCode(value: unknown): HeldItem["sourceKind"]
 }
 
 function encodeShareSelection(selection: PoseSelection): SharedSelectionPayload {
+  if (selection.kind === "none") {
+    return [3, 0];
+  }
+
   if (selection.kind === "bone") {
     const boneIndex = POSE_BONES.findIndex((bone) => bone.id === selection.id);
 
@@ -1738,6 +1746,10 @@ function decodeShareSelection(payload: unknown): PoseSelection {
 
   const selectionKind = payload[0];
   const selectionIndex = typeof payload[1] === "number" ? Math.trunc(payload[1]) : -1;
+
+  if (selectionKind === 3) {
+    return { kind: "none" };
+  }
 
   if (selectionKind === 0) {
     const boneId = POSE_BONES[selectionIndex]?.id;
@@ -2838,6 +2850,10 @@ export default function App() {
   }
 
   function resolveSelectedBoneId(selection: PoseSelection): PoseBoneId {
+    if (selection.kind === "none") {
+      return "head";
+    }
+
     if (selection.kind === "bone") {
       return selection.id;
     }
@@ -3369,6 +3385,10 @@ export default function App() {
     viewer: SkinViewer,
     selection: PoseSelection,
   ): RotationGizmoBinding | null {
+    if (selection.kind === "none") {
+      return null;
+    }
+
     if (selection.kind === "joint") {
       const advancedJointObject = getAdvancedAvatarJointObject(viewer, selection.id);
 
@@ -3576,7 +3596,7 @@ export default function App() {
 
     disposeSelectedOutline();
 
-    if (!skin) {
+    if (!skin || selectedPoseSelection.kind === "none") {
       return;
     }
 
@@ -4170,6 +4190,9 @@ export default function App() {
 
     const raycaster = new Raycaster();
     const pointer = new Vector2();
+    const viewportPointerStart = new Vector2();
+    let activeViewportPointerId: number | null = null;
+    let didViewportPointerMove = false;
     const boneTargets = [
       { id: "head", object: viewer.playerObject.skin.head },
       { id: "leftArm", object: viewer.playerObject.skin.leftArm },
@@ -4205,6 +4228,10 @@ export default function App() {
         return;
       }
 
+      if (didViewportPointerMove) {
+        return;
+      }
+
       const rect = canvas.getBoundingClientRect();
 
       if (rect.width === 0 || rect.height === 0) {
@@ -4223,6 +4250,10 @@ export default function App() {
       const selectedBoneId = resolveBoneFromObject(hitObject);
 
       if (!selectedBoneId) {
+        updateDocument(activeDocumentIdRef.current, (document) => ({
+          ...document,
+          selectedPoseSelection: { kind: "none" },
+        }));
         return;
       }
 
@@ -4230,6 +4261,29 @@ export default function App() {
         ...document,
         selectedPoseSelection: { kind: "bone", id: selectedBoneId },
       }));
+    };
+
+    const handleViewportPointerDown = (event: PointerEvent) => {
+      activeViewportPointerId = event.isPrimary && event.button === 0 ? event.pointerId : null;
+      didViewportPointerMove = false;
+      viewportPointerStart.set(event.clientX, event.clientY);
+    };
+
+    const handleViewportPointerMove = (event: PointerEvent) => {
+      if (event.pointerId !== activeViewportPointerId || didViewportPointerMove) {
+        return;
+      }
+
+      const movementX = event.clientX - viewportPointerStart.x;
+      const movementY = event.clientY - viewportPointerStart.y;
+
+      didViewportPointerMove = movementX * movementX + movementY * movementY > 16;
+    };
+
+    const handleViewportPointerEnd = (event: PointerEvent) => {
+      if (event.pointerId === activeViewportPointerId) {
+        activeViewportPointerId = null;
+      }
     };
 
     const handleViewportGizmoClick = (event: MouseEvent) => {
@@ -4245,6 +4299,10 @@ export default function App() {
       snapViewerCameraToGizmoView(viewer, snappedView);
     };
 
+    canvas.addEventListener("pointerdown", handleViewportPointerDown);
+    window.addEventListener("pointermove", handleViewportPointerMove);
+    window.addEventListener("pointerup", handleViewportPointerEnd);
+    window.addEventListener("pointercancel", handleViewportPointerEnd);
     canvas.addEventListener("click", handleViewportClick);
     gizmoCanvas.addEventListener("click", handleViewportGizmoClick);
 
@@ -4271,6 +4329,10 @@ export default function App() {
 
     return () => {
       resizeObserver.disconnect();
+      canvas.removeEventListener("pointerdown", handleViewportPointerDown);
+      window.removeEventListener("pointermove", handleViewportPointerMove);
+      window.removeEventListener("pointerup", handleViewportPointerEnd);
+      window.removeEventListener("pointercancel", handleViewportPointerEnd);
       canvas.removeEventListener("click", handleViewportClick);
       gizmoCanvas.removeEventListener("click", handleViewportGizmoClick);
       disposeSelectedOutline();

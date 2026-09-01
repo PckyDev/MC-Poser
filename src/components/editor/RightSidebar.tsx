@@ -128,32 +128,40 @@ export function RightSidebar({
   const [editingHeldItemValue, setEditingHeldItemValue] = useState("");
   const fallbackBone = visibleBones[0]!;
   const selectedHeldItemArmId =
-    selectedSelection.kind === "heldItem"
-      ? selectedSelection.id
-      : selectedSelection.kind === "bone" && (selectedSelection.id === "leftArm" || selectedSelection.id === "rightArm")
+    selectedSelection.kind === "none"
+      ? null
+      : selectedSelection.kind === "heldItem"
         ? selectedSelection.id
-        : null;
+        : selectedSelection.kind === "bone" && (selectedSelection.id === "leftArm" || selectedSelection.id === "rightArm")
+          ? selectedSelection.id
+          : null;
 
   const selectedBone =
-    selectedSelection.kind === "bone"
-      ? visibleBones.find((bone) => bone.id === selectedSelection.id) ?? fallbackBone
-      : selectedSelection.kind === "heldItem"
+    selectedSelection.kind === "none"
+      ? fallbackBone
+      : selectedSelection.kind === "bone"
         ? visibleBones.find((bone) => bone.id === selectedSelection.id) ?? fallbackBone
-        : visibleBones.find((bone) => bone.fields.some((field) => field.key === selectedSelection.id)) ?? fallbackBone;
+        : selectedSelection.kind === "heldItem"
+          ? visibleBones.find((bone) => bone.id === selectedSelection.id) ?? fallbackBone
+          : visibleBones.find((bone) => bone.fields.some((field) => field.key === selectedSelection.id)) ?? fallbackBone;
 
   const selectedFields =
-    selectedSelection.kind === "bone"
-      ? selectedBone.fields
-      : selectedSelection.kind === "heldItem"
-        ? []
-        : selectedBone.fields.filter((field) => field.key === selectedSelection.id);
+    selectedSelection.kind === "none"
+      ? []
+      : selectedSelection.kind === "bone"
+        ? selectedBone.fields
+        : selectedSelection.kind === "heldItem"
+          ? []
+          : selectedBone.fields.filter((field) => field.key === selectedSelection.id);
 
   const selectionTitle =
-    selectedSelection.kind === "bone"
-      ? selectedBone.label
-      : selectedSelection.kind === "heldItem"
-        ? `${formatHeldItemArmLabel(selectedSelection.id)} Held Item`
-        : (selectedFields[0]?.label ?? selectedBone.label);
+    selectedSelection.kind === "none"
+      ? "No part selected"
+      : selectedSelection.kind === "bone"
+        ? selectedBone.label
+        : selectedSelection.kind === "heldItem"
+          ? `${formatHeldItemArmLabel(selectedSelection.id)} Held Item`
+          : (selectedFields[0]?.label ?? selectedBone.label);
   const heldItem = selectedHeldItemArmId ? heldItems[selectedHeldItemArmId] : null;
 
   useEffect(() => {

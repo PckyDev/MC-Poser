@@ -68,6 +68,7 @@ export type AdvancedArmCapTextureOffsets = {
 export type PoseBoneId = "head" | "torso" | "leftArm" | "rightArm" | "leftLeg" | "rightLeg";
 
 export type PoseSelection =
+  | { kind: "none" }
   | { kind: "bone"; id: PoseBoneId }
   | { kind: "joint"; id: keyof PoseState }
   | { kind: "heldItem"; id: HeldItemArmId };

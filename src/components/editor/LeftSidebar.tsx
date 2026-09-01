@@ -49,6 +49,9 @@ export function LeftSidebar({
                         ? "bone-tree-button is-active"
                         : "bone-tree-button"
                     }
+                    aria-pressed={
+                      selectedSelection.kind === "bone" && selectedSelection.id === bone.id
+                    }
                     type="button"
                     onClick={() => onSelectBone(bone.id)}
                   >
@@ -64,6 +67,9 @@ export function LeftSidebar({
                             ? "bone-tree-joint-button is-active"
                             : "bone-tree-joint-button"
                         }
+                        aria-pressed={
+                          selectedSelection.kind === "joint" && selectedSelection.id === field.key
+                        }
                         type="button"
                         onClick={() => onSelectJoint(field.key)}
                       >
@@ -77,6 +83,9 @@ export function LeftSidebar({
                           selectedSelection.kind === "heldItem" && selectedSelection.id === heldItemArmId
                             ? "bone-tree-joint-button is-active"
                             : "bone-tree-joint-button"
+                        }
+                        aria-pressed={
+                          selectedSelection.kind === "heldItem" && selectedSelection.id === heldItemArmId
                         }
                         type="button"
                         onClick={() => onSelectHeldItem(heldItemArmId)}
