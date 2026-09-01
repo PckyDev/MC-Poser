@@ -145,6 +145,32 @@ type WorkspaceDocument = {
   uploadModel: ModelPreference;
 };
 
+type DocumentHistorySnapshot = Pick<
+  WorkspaceDocument,
+  | "advancedArmCapTextureOffsets"
+  | "avatarType"
+  | "heldItems"
+  | "pose"
+  | "poseFileName"
+  | "selectedPreset"
+  | "showHeldItems"
+  | "showOuterLayer"
+  | "showOuterLayerIn3d"
+  | "uploadModel"
+>;
+
+type DocumentHistory = {
+  future: DocumentHistorySnapshot[];
+  lastGroup: string | null;
+  lastGroupAt: number;
+  past: DocumentHistorySnapshot[];
+};
+
+type DocumentUpdateOptions = {
+  historyGroup?: string;
+  skipHistory?: boolean;
+};
+
 type ImportedWorkspaceFile = {
   version?: unknown;
   poseFileName?: unknown;
@@ -188,6 +214,8 @@ type PendingNewFileUpload = {
 
 const DEFAULT_EXPORT_BACKGROUND_COLOR = "#242a31";
 const EXPORT_PREVIEW_MAX_EDGE = 560;
+const HISTORY_GROUP_WINDOW_MS = 750;
+const MAX_DOCUMENT_HISTORY_LENGTH = 100;
 const SHARE_PROJECT_HASH_KEY = "p";
 const SHARE_IMAGE_HASH_KEY = "i";
 const LEGACY_SHARE_PROJECT_HASH_KEY = "share-project";
@@ -2417,6 +2445,7 @@ export default function App() {
   const sceneDebugCubeRef = useRef<Mesh | null>(null);
   const sceneDebugVoxelCloneRef = useRef<Mesh | null>(null);
   const documentsRef = useRef<WorkspaceDocument[]>([initialDocument]);
+  const documentHistoryRef = useRef<Map<string, DocumentHistory>>(new Map());
   const activeDocumentIdRef = useRef(initialDocument.id);
   const nextPoseIndexRef = useRef(2);
   const exportPreviewRequestIdRef = useRef(0);
@@ -2487,6 +2516,9 @@ export default function App() {
     uploadModel,
   } = activeDocument;
   const heldItemGeometryKey = buildHeldItemGeometryKey(heldItems);
+  const activeDocumentHistory = documentHistoryRef.current.get(activeDocumentId);
+  const canUndo = Boolean(activeDocumentHistory?.past.length);
+  const canRedo = Boolean(activeDocumentHistory?.future.length);
 
   useEffect(() => {
     documentsRef.current = documents;
@@ -2632,22 +2664,258 @@ export default function App() {
     });
   }
 
+  function createDocumentHistorySnapshot(
+    document: WorkspaceDocument,
+  ): DocumentHistorySnapshot {
+    return {
+      advancedArmCapTextureOffsets: document.advancedArmCapTextureOffsets,
+      avatarType: document.avatarType,
+      heldItems: document.heldItems,
+      pose: document.pose,
+      poseFileName: document.poseFileName,
+      selectedPreset: document.selectedPreset,
+      showHeldItems: document.showHeldItems,
+      showOuterLayer: document.showOuterLayer,
+      showOuterLayerIn3d: document.showOuterLayerIn3d,
+      uploadModel: document.uploadModel,
+    };
+  }
+
+  function areDocumentHistorySnapshotsEqual(
+    first: DocumentHistorySnapshot,
+    second: DocumentHistorySnapshot,
+  ): boolean {
+    return (
+      first.advancedArmCapTextureOffsets === second.advancedArmCapTextureOffsets &&
+      first.avatarType === second.avatarType &&
+      first.heldItems === second.heldItems &&
+      first.pose === second.pose &&
+      first.poseFileName === second.poseFileName &&
+      first.selectedPreset === second.selectedPreset &&
+      first.showHeldItems === second.showHeldItems &&
+      first.showOuterLayer === second.showOuterLayer &&
+      first.showOuterLayerIn3d === second.showOuterLayerIn3d &&
+      first.uploadModel === second.uploadModel
+    );
+  }
+
+  function getDocumentHistory(documentId: string): DocumentHistory {
+    const existingHistory = documentHistoryRef.current.get(documentId);
+
+    if (existingHistory) {
+      return existingHistory;
+    }
+
+    const nextHistory: DocumentHistory = {
+      future: [],
+      lastGroup: null,
+      lastGroupAt: 0,
+      past: [],
+    };
+
+    documentHistoryRef.current.set(documentId, nextHistory);
+    return nextHistory;
+  }
+
+  function restoreDocumentHistorySnapshot(
+    document: WorkspaceDocument,
+    snapshot: DocumentHistorySnapshot,
+  ): WorkspaceDocument {
+    const supportedPoseKeys = new Set(
+      getPoseBones(snapshot.avatarType).flatMap((bone) => bone.fields.map((field) => field.key)),
+    );
+    const selectedPoseSelection =
+      document.selectedPoseSelection.kind === "joint" &&
+      !supportedPoseKeys.has(document.selectedPoseSelection.id)
+        ? { kind: "bone", id: "head" } as const
+        : document.selectedPoseSelection;
+
+    return {
+      ...document,
+      ...snapshot,
+      selectedPoseSelection,
+      skin:
+        document.skin?.origin === "upload"
+          ? {
+              ...document.skin,
+              modelPreference: snapshot.uploadModel,
+            }
+          : document.skin,
+    };
+  }
+
   function updateDocument(
     documentId: string,
     updater: (currentDocument: WorkspaceDocument) => WorkspaceDocument,
+    options: DocumentUpdateOptions = {},
   ): void {
-    setDocuments((currentDocuments) =>
-      currentDocuments.map((document) =>
-        document.id === documentId ? updater(document) : document,
-      ),
-    );
+    let didUpdate = false;
+    const nextDocuments = documentsRef.current.map((document) => {
+      if (document.id !== documentId) {
+        return document;
+      }
+
+      const nextDocument = updater(document);
+
+      if (nextDocument === document) {
+        return document;
+      }
+
+      const history = getDocumentHistory(documentId);
+      const currentSnapshot = createDocumentHistorySnapshot(document);
+      const nextSnapshot = createDocumentHistorySnapshot(nextDocument);
+      const hasUndoableChange = !areDocumentHistorySnapshotsEqual(
+        currentSnapshot,
+        nextSnapshot,
+      );
+
+      if (!options.skipHistory && hasUndoableChange) {
+        const now = Date.now();
+        const canCoalesceHistory =
+          Boolean(options.historyGroup) &&
+          history.lastGroup === options.historyGroup &&
+          now - history.lastGroupAt <= HISTORY_GROUP_WINDOW_MS;
+
+        if (!canCoalesceHistory) {
+          history.past.push(currentSnapshot);
+
+          if (history.past.length > MAX_DOCUMENT_HISTORY_LENGTH) {
+            history.past.shift();
+          }
+        }
+
+        history.future = [];
+        history.lastGroup = options.historyGroup ?? null;
+        history.lastGroupAt = now;
+      } else {
+        history.lastGroup = null;
+        history.lastGroupAt = 0;
+      }
+
+      didUpdate = true;
+      return nextDocument;
+    });
+
+    if (!didUpdate) {
+      return;
+    }
+
+    documentsRef.current = nextDocuments;
+    setDocuments(nextDocuments);
   }
+
+  function undoDocumentChange(): void {
+    const documentId = activeDocumentIdRef.current;
+    const history = getDocumentHistory(documentId);
+    const previousSnapshot = history.past.pop();
+
+    if (!previousSnapshot) {
+      return;
+    }
+
+    history.lastGroup = null;
+    history.lastGroupAt = 0;
+    const nextDocuments = documentsRef.current.map((document) => {
+      if (document.id !== documentId) {
+        return document;
+      }
+
+      history.future.push(createDocumentHistorySnapshot(document));
+      return restoreDocumentHistorySnapshot(document, previousSnapshot);
+    });
+
+    documentsRef.current = nextDocuments;
+    setDocuments(nextDocuments);
+    setError(null);
+    setStatus("Undid the last edit.");
+  }
+
+  function redoDocumentChange(): void {
+    const documentId = activeDocumentIdRef.current;
+    const history = getDocumentHistory(documentId);
+    const nextSnapshot = history.future.pop();
+
+    if (!nextSnapshot) {
+      return;
+    }
+
+    history.lastGroup = null;
+    history.lastGroupAt = 0;
+    const nextDocuments = documentsRef.current.map((document) => {
+      if (document.id !== documentId) {
+        return document;
+      }
+
+      history.past.push(createDocumentHistorySnapshot(document));
+      return restoreDocumentHistorySnapshot(document, nextSnapshot);
+    });
+
+    documentsRef.current = nextDocuments;
+    setDocuments(nextDocuments);
+    setError(null);
+    setStatus("Redid the last edit.");
+  }
+
+  useEffect(() => {
+    const handleHistoryShortcut = (event: KeyboardEvent) => {
+      if (!event.ctrlKey && !event.metaKey) {
+        return;
+      }
+
+      const target = event.target;
+      const isTextEntryInput =
+        target instanceof HTMLInputElement &&
+        !["button", "checkbox", "radio", "range"].includes(target.type);
+
+      if (
+        isTextEntryInput ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target instanceof HTMLElement && target.isContentEditable)
+      ) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      const isUndo = key === "z" && !event.shiftKey;
+      const isRedo = (key === "z" && event.shiftKey) || key === "y";
+
+      if (!isUndo && !isRedo) {
+        return;
+      }
+
+      event.preventDefault();
+
+      if (isRedo) {
+        redoDocumentChange();
+      } else {
+        undoDocumentChange();
+      }
+    };
+
+    document.addEventListener("keydown", handleHistoryShortcut);
+
+    return () => document.removeEventListener("keydown", handleHistoryShortcut);
+  }, []);
 
   function switchToDocument(documentId: string): void {
     const nextDocument = documents.find((document) => document.id === documentId);
 
     if (!nextDocument) {
       return;
+    }
+
+    const currentHistory = documentHistoryRef.current.get(activeDocumentIdRef.current);
+    const nextHistory = documentHistoryRef.current.get(documentId);
+
+    if (currentHistory) {
+      currentHistory.lastGroup = null;
+      currentHistory.lastGroupAt = 0;
+    }
+
+    if (nextHistory) {
+      nextHistory.lastGroup = null;
+      nextHistory.lastGroupAt = 0;
     }
 
     setActiveDocumentId(documentId);
@@ -2664,8 +2932,10 @@ export default function App() {
     overrides: Partial<Omit<WorkspaceDocument, "id" | "poseFileName">> = {},
   ): WorkspaceDocument {
     const nextDocument = createWorkspaceDocument(rawName, overrides);
+    const nextDocuments = [...documentsRef.current, nextDocument];
 
-    setDocuments((currentDocuments) => [...currentDocuments, nextDocument]);
+    documentsRef.current = nextDocuments;
+    setDocuments(nextDocuments);
     setActiveDocumentId(nextDocument.id);
     setError(null);
 
@@ -2680,17 +2950,18 @@ export default function App() {
 
     if (!hasEnteredWorkspace && documents.length === 1) {
       const placeholderDocumentId = activeDocumentId;
-
-      setDocuments((currentDocuments) =>
-        currentDocuments.map((document) =>
-          document.id === placeholderDocumentId
-            ? {
-                ...nextDocument,
-                id: placeholderDocumentId,
-              }
-            : document,
-        ),
+      const nextDocuments = documentsRef.current.map((document) =>
+        document.id === placeholderDocumentId
+          ? {
+              ...nextDocument,
+              id: placeholderDocumentId,
+            }
+          : document,
       );
+
+      documentHistoryRef.current.delete(placeholderDocumentId);
+      documentsRef.current = nextDocuments;
+      setDocuments(nextDocuments);
 
       setActiveDocumentId(placeholderDocumentId);
       setError(null);
@@ -3968,13 +4239,6 @@ export default function App() {
         ),
       };
 
-      if (
-        canRevokeHeldItemSource(previousHeldItem) &&
-        previousHeldItem.source !== appliedHeldItem.source
-      ) {
-        URL.revokeObjectURL(previousHeldItem.source);
-      }
-
       return {
         ...currentDocument,
         heldItems: {
@@ -4014,7 +4278,7 @@ export default function App() {
           },
         },
       };
-    });
+    }, { historyGroup: `held-item:${armId}:${adjustmentKey}` });
     setError(null);
   }
 
@@ -4062,12 +4326,6 @@ export default function App() {
 
   function removeHeldItemFromArm(armId: HeldItemArmId): void {
     updateDocument(activeDocumentId, (currentDocument) => {
-      const previousHeldItem = currentDocument.heldItems[armId];
-
-      if (canRevokeHeldItemSource(previousHeldItem)) {
-        URL.revokeObjectURL(previousHeldItem.source);
-      }
-
       return {
         ...currentDocument,
         heldItems: {
@@ -4354,6 +4612,17 @@ export default function App() {
       sceneDebugVoxelCloneRef.current = null;
       documentsRef.current.forEach(releaseDocumentUploadSkin);
       documentsRef.current.forEach(releaseDocumentHeldItems);
+      documentHistoryRef.current.forEach((history) => {
+        [...history.past, ...history.future].forEach((snapshot) => {
+          HELD_ITEM_ARM_IDS.forEach((armId) => {
+            const heldItem = snapshot.heldItems[armId];
+
+            if (canRevokeHeldItemSource(heldItem)) {
+              URL.revokeObjectURL(heldItem.source);
+            }
+          });
+        });
+      });
       viewer.dispose();
       viewerRef.current = null;
       (window as DebugWindow).__MC_POSER_DEBUG_HELPERS__ = undefined;
@@ -5124,20 +5393,20 @@ export default function App() {
     updateDocument(activeDocumentId, (currentDocument) => ({
       ...currentDocument,
       selectedPoseSelection: { kind: "bone", id: nextBoneId },
-    }));
+    }), { skipHistory: true });
   }
   function handleSelectHeldItem(nextArmId: HeldItemArmId): void {
     updateDocument(activeDocumentId, (currentDocument) => ({
       ...currentDocument,
       selectedPoseSelection: { kind: "heldItem", id: nextArmId },
-    }));
+    }), { skipHistory: true });
   }
 
   function handleSelectJoint(nextJointId: keyof PoseState): void {
     updateDocument(activeDocumentId, (currentDocument) => ({
       ...currentDocument,
       selectedPoseSelection: { kind: "joint", id: nextJointId },
-    }));
+    }), { skipHistory: true });
   }
 
   function updatePose(key: keyof PoseState, value: number): void {
@@ -5148,7 +5417,7 @@ export default function App() {
         ...currentDocument.pose,
         [key]: value,
       },
-    }));
+    }), { historyGroup: `pose:${key}` });
   }
 
   function applyPreset(nextPreset: PosePresetName): void {
@@ -5507,7 +5776,7 @@ export default function App() {
     updateDocument(activeDocumentId, (currentDocument) => ({
       ...currentDocument,
       poseFileName: nextValue,
-    }));
+    }), { historyGroup: "pose-file-name" });
   }
 
   function handleUploadModelChange(nextModel: ModelPreference): void {
@@ -5601,6 +5870,8 @@ export default function App() {
         }
       >
       <EditorTopbar
+        canRedo={canRedo}
+        canUndo={canUndo}
         isExportDisabled={isExportDisabled}
         isShareDisabled={isShareDisabled}
         selectedPreset={selectedPreset}
@@ -5623,6 +5894,8 @@ export default function App() {
         onOpenShareModal={openShareModal}
         onOpenSupportLink={openSupportLink}
         onOpenExportModal={openExportModal}
+        onRedo={redoDocumentChange}
+        onUndo={undoDocumentChange}
       />
 
       <DocumentTabBar

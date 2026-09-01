@@ -338,6 +338,21 @@
   color: var(--accent-strong);
 }
 
+.menu-dropdown-item--shortcut {
+  min-width: 13rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.menu-dropdown-item--shortcut kbd {
+  color: var(--text-faint);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+  font-weight: 400;
+}
+
 .menu-dropdown-divider {
   height: 1px;
   margin: 0.1rem 0;

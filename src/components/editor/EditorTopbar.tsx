@@ -6,6 +6,8 @@ import { PRESET_NAMES, type PosePresetName } from "../../config/pose";
 import { formatPresetName } from "../../utils/editor";
 
 type EditorTopbarProps = {
+  canRedo: boolean;
+  canUndo: boolean;
   isExportDisabled: boolean;
   isShareDisabled: boolean;
   selectedPreset: PosePresetName | null;
@@ -24,9 +26,13 @@ type EditorTopbarProps = {
   onOpenShareModal: () => void;
   onOpenSupportLink: () => void;
   onOpenExportModal: () => void;
+  onRedo: () => void;
+  onUndo: () => void;
 };
 
 export function EditorTopbar({
+  canRedo,
+  canUndo,
   isExportDisabled,
   isShareDisabled,
   selectedPreset,
@@ -45,17 +51,22 @@ export function EditorTopbar({
   onOpenShareModal,
   onOpenSupportLink,
   onOpenExportModal,
+  onRedo,
+  onUndo,
 }: EditorTopbarProps) {
+  const [isEditMenuOpen, setIsEditMenuOpen] = useState(false);
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
   const [isPoseMenuOpen, setIsPoseMenuOpen] = useState(false);
   const [isViewMenuOpen, setIsViewMenuOpen] = useState(false);
   const [isHelpMenuOpen, setIsHelpMenuOpen] = useState(false);
+  const editMenuRef = useRef<HTMLDivElement | null>(null);
   const fileMenuRef = useRef<HTMLDivElement | null>(null);
   const poseMenuRef = useRef<HTMLDivElement | null>(null);
   const viewMenuRef = useRef<HTMLDivElement | null>(null);
   const helpMenuRef = useRef<HTMLDivElement | null>(null);
 
   function closeAllMenus(): void {
+    setIsEditMenuOpen(false);
     setIsFileMenuOpen(false);
     setIsPoseMenuOpen(false);
     setIsViewMenuOpen(false);
@@ -63,18 +74,20 @@ export function EditorTopbar({
   }
 
   useEffect(() => {
-    if (!isFileMenuOpen && !isPoseMenuOpen && !isViewMenuOpen && !isHelpMenuOpen) {
+    if (!isEditMenuOpen && !isFileMenuOpen && !isPoseMenuOpen && !isViewMenuOpen && !isHelpMenuOpen) {
       return;
     }
 
     const handlePointerDown = (event: MouseEvent) => {
       const targetNode = event.target as Node;
+      const clickedOutsideEditMenu = editMenuRef.current && !editMenuRef.current.contains(targetNode);
       const clickedOutsideFileMenu = fileMenuRef.current && !fileMenuRef.current.contains(targetNode);
       const clickedOutsidePoseMenu = poseMenuRef.current && !poseMenuRef.current.contains(targetNode);
       const clickedOutsideViewMenu = viewMenuRef.current && !viewMenuRef.current.contains(targetNode);
       const clickedOutsideHelpMenu = helpMenuRef.current && !helpMenuRef.current.contains(targetNode);
 
       if (
+        clickedOutsideEditMenu &&
         clickedOutsideFileMenu &&
         clickedOutsidePoseMenu &&
         clickedOutsideViewMenu &&
@@ -97,9 +110,14 @@ export function EditorTopbar({
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isFileMenuOpen, isHelpMenuOpen, isPoseMenuOpen, isViewMenuOpen]);
+  }, [isEditMenuOpen, isFileMenuOpen, isHelpMenuOpen, isPoseMenuOpen, isViewMenuOpen]);
 
   function handleFileAction(action: () => void): void {
+    action();
+    closeAllMenus();
+  }
+
+  function handleEditAction(action: () => void): void {
     action();
     closeAllMenus();
   }
@@ -140,6 +158,7 @@ export function EditorTopbar({
             aria-expanded={isFileMenuOpen}
             onClick={() => {
               setIsFileMenuOpen((currentValue) => !currentValue);
+              setIsEditMenuOpen(false);
               setIsPoseMenuOpen(false);
               setIsViewMenuOpen(false);
               setIsHelpMenuOpen(false);
@@ -171,6 +190,50 @@ export function EditorTopbar({
           ) : null}
         </div>
 
+        <div className="menu-dropdown" ref={editMenuRef}>
+          <button
+            className="menu-button menu-button--dropdown"
+            type="button"
+            aria-expanded={isEditMenuOpen}
+            onClick={() => {
+              setIsEditMenuOpen((currentValue) => !currentValue);
+              setIsFileMenuOpen(false);
+              setIsPoseMenuOpen(false);
+              setIsViewMenuOpen(false);
+              setIsHelpMenuOpen(false);
+            }}
+          >
+            Edit
+            <FontAwesomeIcon
+              className={isEditMenuOpen ? "menu-button-caret is-open" : "menu-button-caret"}
+              icon={faChevronDown}
+            />
+          </button>
+
+          {isEditMenuOpen ? (
+            <div className="menu-dropdown-panel" role="menu" aria-label="Edit actions">
+              <button
+                className="menu-dropdown-item menu-dropdown-item--shortcut"
+                type="button"
+                disabled={!canUndo}
+                onClick={() => handleEditAction(onUndo)}
+              >
+                <span>Undo</span>
+                <kbd>Ctrl/Cmd+Z</kbd>
+              </button>
+              <button
+                className="menu-dropdown-item menu-dropdown-item--shortcut"
+                type="button"
+                disabled={!canRedo}
+                onClick={() => handleEditAction(onRedo)}
+              >
+                <span>Redo</span>
+                <kbd>Ctrl/Cmd+Shift+Z</kbd>
+              </button>
+            </div>
+          ) : null}
+        </div>
+
         <div className="menu-dropdown" ref={poseMenuRef}>
           <button
             className="menu-button menu-button--dropdown"
@@ -178,6 +241,7 @@ export function EditorTopbar({
             aria-expanded={isPoseMenuOpen}
             onClick={() => {
               setIsPoseMenuOpen((currentValue) => !currentValue);
+              setIsEditMenuOpen(false);
               setIsFileMenuOpen(false);
               setIsViewMenuOpen(false);
               setIsHelpMenuOpen(false);
@@ -219,6 +283,7 @@ export function EditorTopbar({
             aria-expanded={isViewMenuOpen}
             onClick={() => {
               setIsViewMenuOpen((currentValue) => !currentValue);
+              setIsEditMenuOpen(false);
               setIsFileMenuOpen(false);
               setIsPoseMenuOpen(false);
               setIsHelpMenuOpen(false);
@@ -247,6 +312,7 @@ export function EditorTopbar({
             aria-expanded={isHelpMenuOpen}
             onClick={() => {
               setIsHelpMenuOpen((currentValue) => !currentValue);
+              setIsEditMenuOpen(false);
               setIsFileMenuOpen(false);
               setIsPoseMenuOpen(false);
               setIsViewMenuOpen(false);
