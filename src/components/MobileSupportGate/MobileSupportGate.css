@@ -1,0 +1,77 @@
+.mobile-support-gate {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  padding:
+    max(1.5rem, env(safe-area-inset-top))
+    max(1.25rem, env(safe-area-inset-right))
+    max(1.5rem, env(safe-area-inset-bottom))
+    max(1.25rem, env(safe-area-inset-left));
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.026) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.026) 1px, transparent 1px),
+    radial-gradient(circle at 50% 18%, rgba(240, 142, 58, 0.16), transparent 34%),
+    linear-gradient(180deg, #242a32 0%, #181b20 100%);
+  background-size: 40px 40px, 40px 40px, auto, auto;
+
+  & .card {
+    width: min(31rem, 100%);
+    display: grid;
+    justify-items: center;
+    gap: 1.25rem;
+    padding: clamp(1.75rem, 7vw, 3rem);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(26, 30, 36, 0.9);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      0 28px 80px rgba(0, 0, 0, 0.38);
+    text-align: center;
+  }
+
+  & .brand-icon {
+    width: clamp(4.5rem, 22vw, 6.5rem);
+    height: auto;
+    display: block;
+  }
+
+  & .device-icon {
+    width: 3.5rem;
+    height: 3.5rem;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(240, 142, 58, 0.4);
+    background: var(--accent-muted);
+    color: var(--accent-strong);
+    font-size: 1.45rem;
+  }
+
+  & .copy {
+    display: grid;
+    gap: 0.8rem;
+
+    & .eyebrow {
+      color: var(--accent-strong);
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    & h1 {
+      margin: 0;
+      color: var(--text-main);
+      font-size: clamp(1.45rem, 7vw, 2rem);
+      line-height: 1.15;
+    }
+
+    & p {
+      margin: 0;
+      color: var(--text-dim);
+      font-size: 0.96rem;
+      line-height: 1.65;
+    }
+  }
+}
