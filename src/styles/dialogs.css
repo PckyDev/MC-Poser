@@ -703,6 +703,25 @@
   line-height: 1.55;
 }
 
+.help-modal-discord-copy strong {
+  color: var(--text-main);
+  font-weight: 600;
+}
+
+.help-modal-discord-link {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.2rem;
+  text-decoration: none;
+}
+
+.help-modal-discord-link svg {
+  font-size: 0.76rem;
+  opacity: 0.7;
+}
+
 .help-modal-image {
   bottom: -22rem;
 }

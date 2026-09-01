@@ -62,6 +62,7 @@ import {
   POSE_PRESETS,
   type PosePresetName,
 } from "./config/pose";
+import { DISCORD_INVITE_URL } from "./config/links";
 import type {
   ArmModel,
   AdvancedArmCapTextureOffsets,
@@ -3896,6 +3897,10 @@ export default function App() {
     window.open("https://ko-fi.com/pockydev", "_blank", "noopener,noreferrer");
   }
 
+  function openDiscord(): void {
+    window.open(DISCORD_INVITE_URL, "_blank", "noopener,noreferrer");
+  }
+
   function openGitHubRepo(): void {
     window.open("https://github.com/PckyDev/MC-Poser", "_blank", "noopener,noreferrer");
   }
@@ -5538,6 +5543,7 @@ export default function App() {
         isShareDisabled={isShareDisabled}
         selectedPreset={selectedPreset}
         onOpenDocumentModal={openDocumentModal}
+        onOpenDiscord={openDiscord}
         onOpenGitHubRepo={openGitHubRepo}
         onOpenIdeasModal={openIdeasModal}
         onOpenNewFileModal={openNewFileModal}

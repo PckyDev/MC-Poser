@@ -10,6 +10,7 @@ import {
   faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 
+import { DISCORD_INVITE_URL } from "../../config/links";
 import pockydevPoseImage from "../../img/pockydev-pose.png";
 
 export type HelpContactModalKind = "ideas" | "issues";
@@ -91,8 +92,19 @@ export function HelpContactModal({ kind, onClose }: HelpContactModalProps) {
               <strong className="help-modal-discord-username">PockyDev</strong>
 
               <p className="help-modal-discord-copy">
-                Add me directly if you want the fastest route for follow-up questions.
+                Join my projects server and head to <strong>#mc-poser</strong> to report issues,
+                suggest ideas, or ask follow-up questions.
               </p>
+
+              <a
+                className="toolbar-button help-modal-discord-link"
+                href={DISCORD_INVITE_URL}
+                rel="noreferrer"
+                target="_blank"
+              >
+                <span>Join Discord</span>
+                <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
+              </a>
             </div>
           </div>
 
