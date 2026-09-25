@@ -67,6 +67,26 @@ npm run preview
 
 `npm run preview` serves the static client only and does not include the `/api/skin` lookup route.
 
+## Regression tests
+
+```bash
+npx playwright install chromium
+npm run test:e2e
+npm run typecheck
+```
+
+The head-underside suite generates asymmetric four-color PNG fixtures and tests the
+actual viewer meshes through Chromium. It covers modern classic/slim and legacy
+skins, 64px and 128px atlases, opaque and translucent hat pixels, PNG upload and
+mocked username lookup, all three avatar rigs, explicit classic/slim arms and
+upload auto-detection, and hidden/flat/3D outer layers (including switching back).
+Username lookups are mocked for reproducibility, not used as live Mojang API tests.
+Geometry probes check all four underside quadrants of both head and hat, including
+the separate Advanced voxel renderer. Test-only viewer access is injected by
+Playwright into the dev response and is not included in the production bundle.
+An additional test switches rigs on the same viewer, captures flat/3D undersides,
+and checks that loading a skin without a hat clears the old voxel geometry.
+
 ## Support
 
 - Support development on Ko-Fi: https://ko-fi.com/pockydev

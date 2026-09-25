@@ -5,7 +5,6 @@ import {
   AmbientLight,
   Box3,
   BoxGeometry,
-  BufferAttribute,
   BufferGeometry,
   CanvasTexture,
   DirectionalLight,
@@ -1346,69 +1345,15 @@ function getTexturePreviewDataUrl(texture: Texture | null): string | null {
   }
 }
 
-function setBoxFaceBottomUvs(geometry: BufferGeometry, faceIndex: number, rotate180: boolean): void {
-  const uvAttribute = geometry.getAttribute("uv");
-
-  if (!(uvAttribute instanceof BufferAttribute)) {
-    return;
-  }
-
-  const faceStart = faceIndex * 8;
-  const currentFaceUvs = Array.from(uvAttribute.array as ArrayLike<number>).slice(
-    faceStart,
-    faceStart + 8,
-  );
-
-  if (currentFaceUvs.length < 8) {
-    return;
-  }
-
-  const uValues = [
-    currentFaceUvs[0] ?? 0,
-    currentFaceUvs[2] ?? 0,
-    currentFaceUvs[4] ?? 0,
-    currentFaceUvs[6] ?? 0,
-  ];
-  const vValues = [
-    currentFaceUvs[1] ?? 0,
-    currentFaceUvs[3] ?? 0,
-    currentFaceUvs[5] ?? 0,
-    currentFaceUvs[7] ?? 0,
-  ];
-
-  const uMin = Math.min(...uValues);
-  const uMax = Math.max(...uValues);
-  const vMin = Math.min(...vValues);
-  const vMax = Math.max(...vValues);
-
-  const nextFaceUvs: number[] = rotate180
-    ? [uMax, vMax, uMin, vMax, uMax, vMin, uMin, vMin]
-    : [uMin, vMin, uMax, vMin, uMin, vMax, uMax, vMax];
-
-  uvAttribute.array.set(nextFaceUvs, faceStart);
-  uvAttribute.needsUpdate = true;
-}
-
-function applyClassicHeadBottomUvFix(viewer: SkinViewer): void {
-  const shouldRotate = viewer.playerObject.skin.modelType === "default";
-
-  const headInnerLayer = viewer.playerObject.skin.head.innerLayer;
-  const headOuterLayer = viewer.playerObject.skin.head.outerLayer;
-
-  if (headInnerLayer instanceof Mesh) {
-    setBoxFaceBottomUvs(headInnerLayer.geometry, 3, shouldRotate);
-  }
-
-  if (headOuterLayer instanceof Mesh) {
-    setBoxFaceBottomUvs(headOuterLayer.geometry, 3, shouldRotate);
-  }
-}
-
 function sampleTexturePixel(
   pixelSource: TexturePixelSource,
   x: number,
   y: number,
 ): TexturePixelSample {
+  // Face regions use the normalized 64x64 atlas, including converted legacy skins.
+  // Sample the center of that texel when the source is a higher-resolution skin.
+  x = Math.floor((x + 0.5) * pixelSource.width / 64);
+  y = Math.floor((y + 0.5) * pixelSource.height / 64);
   if (x < 0 || x >= pixelSource.width || y < 0 || y >= pixelSource.height) {
     return {
       red: 0,
@@ -1436,7 +1381,6 @@ function createOuterLayerVoxelGeometry(
   const { width, height, depth } = getOuterLayerDimensions(boneId, modelType);
   const textureOrigin = OUTER_LAYER_TEXTURE_ORIGINS[boneId];
   const surfaceOffset = getOuterLayerShellExpansion(boneId);
-  const rotateBottomFace180 = boneId === "head" && modelType === "default";
   const positions: number[] = [];
   const normals: number[] = [];
   const colors: number[] = [];
@@ -1563,18 +1507,15 @@ function createOuterLayerVoxelGeometry(
     }),
   );
 
-  // BoxGeometry's bottom UVs run texture rows from back to front.
+  // Match skinview3d's bottom UVs for every arm model and skin format.
+  // Arm width does not change head/hat orientation; rows run back to front.
   visitFaceTexels(
     { u: textureOrigin.u + width + depth, v: textureOrigin.v, width, height: depth },
     { axis: "y", outwardDirection: -1 },
     (pixelX, pixelY) => ({
-      x: rotateBottomFace180
-        ? width / 2 - 0.5 - pixelX
-        : -width / 2 + 0.5 + pixelX,
+      x: -width / 2 + 0.5 + pixelX,
       y: -height / 2 - surfaceOffset,
-      z: rotateBottomFace180
-        ? depth / 2 - 0.5 - pixelY
-        : -depth / 2 + 0.5 + pixelY,
+      z: -depth / 2 + 0.5 + pixelY,
     }),
   );
 
@@ -4750,7 +4691,6 @@ export default function App() {
           return;
         }
 
-        applyClassicHeadBottomUvFix(viewer);
         setViewerSkinPreviewUrl(getTexturePreviewDataUrl(viewer.playerObject.skin.map));
         setAdvancedArmCapTextureOffsets(viewer, advancedArmCapTextureOffsets);
         setViewerInnerLayerVisible(viewer, true);

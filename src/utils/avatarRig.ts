@@ -385,6 +385,10 @@ function sampleTexturePixel(
   x: number,
   y: number,
 ): TexturePixelSample {
+  // Face regions use the normalized 64x64 atlas, including converted legacy skins.
+  // Sample the center of that texel when the source is a higher-resolution skin.
+  x = Math.floor((x + 0.5) * pixelSource.width / 64);
+  y = Math.floor((y + 0.5) * pixelSource.height / 64);
   if (x < 0 || x >= pixelSource.width || y < 0 || y >= pixelSource.height) {
     return {
       alpha: 0,
@@ -411,7 +415,6 @@ function createVoxelGeometryFromSkinBox(
   skinRegion: SkinBoxRegion,
   pixelSource: TexturePixelSource,
   surfaceOffset: number,
-  rotateBottomFace180 = false,
 ): BufferGeometry | null {
   const positions: number[] = [];
   const normals: number[] = [];
@@ -533,18 +536,15 @@ function createVoxelGeometryFromSkinBox(
     }),
   );
 
-  // BoxGeometry's bottom UVs run texture rows from back to front.
+  // Match skinview3d's bottom UVs for every arm model and skin format.
+  // Arm width does not change head/hat orientation; rows run back to front.
   visitFaceTexels(
     { u: skinRegion.u + width + depth, v: skinRegion.v, width, height: depth },
     { axis: "y", outwardDirection: -1 },
     (pixelX, pixelY) => ({
-      x: rotateBottomFace180
-        ? width / 2 - 0.5 - pixelX
-        : -width / 2 + 0.5 + pixelX,
+      x: -width / 2 + 0.5 + pixelX,
       y: -height / 2 - surfaceOffset,
-      z: rotateBottomFace180
-        ? depth / 2 - 0.5 - pixelY
-        : -depth / 2 + 0.5 + pixelY,
+      z: -depth / 2 + 0.5 + pixelY,
     }),
   );
 
@@ -1193,7 +1193,6 @@ function ensureHeadVoxelMesh(
     { u: 32, v: 0, width: 8, height: 8, depth: 8 },
     pixelSource,
     0.5,
-    state.modelType === "default",
   );
 
   if (!geometry) {

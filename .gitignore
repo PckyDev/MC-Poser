@@ -4,6 +4,8 @@ dist/
 .wrangler/
 .debug/
 coverage/
+playwright-report/
+test-results/
 
 .env
 .env.*
