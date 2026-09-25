@@ -89,6 +89,26 @@ and checks that loading a skin without a hat clears the old voxel geometry.
 
 ## Support
 
+### Diagnostics for bug reports
+
+Choose **Help > Download Diagnostics**, or use **Download Diagnostics** in
+**Help > Report Bug/Issue**. The JSON includes the active document's pose,
+skin and held-item images, arm/rig/layer settings, camera, lighting/export
+settings, browser/GPU details, build revision, and up to 50 recent uncaught
+errors. Failed asset collection is listed in `warnings` without preventing
+the rest of the download.
+
+Review the file before sharing: it includes document/image labels, usernames,
+and error text. Nothing is uploaded automatically. Cookies, browser storage,
+other open documents, and page query strings/share hashes are not collected.
+For reproduction, save the report's `workspace` object as a `.mcpose` JSON
+file and open it with **File > Open**. Apply camera, lighting, and export
+settings from `rendering` and `editor` separately. A warning about a missing
+image means that original image is also needed.
+
+The diagnostics Playwright tests verify both entry points, workspace reopening,
+error limits, privacy exclusions, and graceful collection failures.
+
 - Support development on Ko-Fi: https://ko-fi.com/pockydev
 - Suggest ideas or report bugs through the in-app `Help` menu.
 - GitHub issues: https://github.com/PckyDev/MC-Poser/issues

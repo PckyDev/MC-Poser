@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer";
+import { execFileSync } from "node:child_process";
 import type { ServerResponse } from "node:http";
 
 import react from "@vitejs/plugin-react";
@@ -71,5 +72,14 @@ function minecraftSkinApiPlugin(): Plugin {
 }
 
 export default defineConfig({
+  define: {
+    __APP_BUILD__: JSON.stringify({
+      revision: (() => {
+        try { return execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(); }
+        catch { return "unknown"; }
+      })(),
+      builtAt: new Date().toISOString(),
+    }),
+  },
   plugins: [react(), minecraftSkinApiPlugin()],
 });

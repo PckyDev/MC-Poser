@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { SkinViewer } from "skinview3d";
+import { collectDiagnostics, diagnosticText, embedDiagnosticAsset } from "./lib/diagnostics";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
 import {
   AmbientLight,
@@ -2401,6 +2402,8 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState("Booting editor viewport...");
   const [error, setError] = useState<string | null>(null);
+  const [isDownloadingDiagnostics, setIsDownloadingDiagnostics] = useState(false);
+  const diagnosticsBusyRef = useRef(false);
   const [startupFileName, setStartupFileName] = useState("untitled-pose-01.mcpose");
   const [startupUsername, setStartupUsername] = useState(DEFAULT_USERNAME);
   const [startupAvatarType, setStartupAvatarType] = useState<AvatarType>("default");
@@ -3468,7 +3471,43 @@ export default function App() {
     downloadLink.download = fileName;
     downloadLink.click();
 
-    URL.revokeObjectURL(fileUrl);
+    window.setTimeout(() => URL.revokeObjectURL(fileUrl), 1000);
+  }
+
+  async function handleDownloadDiagnostics(): Promise<void> {
+    if (diagnosticsBusyRef.current) return;
+    diagnosticsBusyRef.current = true;
+    setIsDownloadingDiagnostics(true);
+    try {
+      const warnings: string[] = [];
+      const report = collectDiagnostics(viewerRef.current, warnings);
+      const snapshot = activeDocument;
+      const editor = {
+        status: diagnosticText(status), error: error ? diagnosticText(error) : null,
+        viewerReady, isLoading, openDocumentCount: documents.length,
+        viewportLightingMode, exportSettings: { ...exportSettings },
+        undoCount: activeDocumentHistory?.past.length ?? 0,
+        redoCount: activeDocumentHistory?.future.length ?? 0,
+      };
+      const workspace = await buildWorkspaceFilePayload({ ...snapshot, skin: null,
+        heldItems: { leftArm: null, rightArm: null } });
+      const [skin, leftArm, rightArm] = await Promise.all([
+        embedDiagnosticAsset(snapshot.skin, "Skin", warnings),
+        embedDiagnosticAsset(snapshot.heldItems.leftArm, "Left held item", warnings),
+        embedDiagnosticAsset(snapshot.heldItems.rightArm, "Right held item", warnings),
+      ]);
+      workspace.skin = skin;
+      workspace.heldItems = { leftArm, rightArm };
+      downloadWorkspaceFile(`mc-poser-diagnostics-${report.createdAt.replace(/[:.]/g, "-")}.json`,
+        JSON.stringify({ ...report, editor, workspace }, null, 2));
+      setStatus(warnings.length ? "Diagnostics downloaded with collection warnings. Review before sharing."
+        : "Diagnostics downloaded. Review the file before sharing it with your bug report.");
+    } catch {
+      setError("Unable to download diagnostics. Please try again.");
+    } finally {
+      diagnosticsBusyRef.current = false;
+      setIsDownloadingDiagnostics(false);
+    }
   }
 
   function downloadExportFile(fileName: string, fileBlob: Blob): void {
@@ -5810,6 +5849,8 @@ export default function App() {
         }
       >
       <EditorTopbar
+        isDownloadingDiagnostics={isDownloadingDiagnostics}
+        onDownloadDiagnostics={() => { void handleDownloadDiagnostics(); }}
         canRedo={canRedo}
         canUndo={canUndo}
         isExportDisabled={isExportDisabled}
@@ -5994,6 +6035,8 @@ export default function App() {
       />
 
       <HelpContactModal
+        isDownloadingDiagnostics={isDownloadingDiagnostics}
+        onDownloadDiagnostics={() => { void handleDownloadDiagnostics(); }}
         kind={helpContactModalKind}
         onClose={closeHelpContactModal}
       />

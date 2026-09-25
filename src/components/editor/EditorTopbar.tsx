@@ -6,6 +6,8 @@ import { PRESET_NAMES, type PosePresetName } from "../../config/pose";
 import { formatPresetName } from "../../utils/editor";
 
 type EditorTopbarProps = {
+  isDownloadingDiagnostics: boolean;
+  onDownloadDiagnostics: () => void;
   canRedo: boolean;
   canUndo: boolean;
   isExportDisabled: boolean;
@@ -31,6 +33,8 @@ type EditorTopbarProps = {
 };
 
 export function EditorTopbar({
+  isDownloadingDiagnostics,
+  onDownloadDiagnostics,
   canRedo,
   canUndo,
   isExportDisabled,
@@ -342,6 +346,11 @@ export function EditorTopbar({
               </button>
               <button className="menu-dropdown-item" type="button" onClick={() => handleHelpAction(onOpenIssueModal)}>
                 Report Bug/Issue
+              </button>
+              <button className="menu-dropdown-item" type="button" disabled={isDownloadingDiagnostics}
+                title="Includes active document images and browser/GPU details. Review before sharing."
+                onClick={() => handleHelpAction(onDownloadDiagnostics)}>
+                {isDownloadingDiagnostics ? "Preparing diagnostics..." : "Download Diagnostics"}
               </button>
             </div>
           ) : null}

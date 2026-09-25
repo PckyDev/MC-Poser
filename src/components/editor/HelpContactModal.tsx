@@ -18,6 +18,8 @@ export type HelpContactModalKind = "ideas" | "issues";
 type HelpContactModalProps = {
   kind: HelpContactModalKind | null;
   onClose: () => void;
+  isDownloadingDiagnostics: boolean;
+  onDownloadDiagnostics: () => void;
 };
 
 const HELP_MODAL_CONTENT = {
@@ -53,7 +55,7 @@ const SOCIAL_LINKS = [
   },
 ] as const;
 
-export function HelpContactModal({ kind, onClose }: HelpContactModalProps) {
+export function HelpContactModal({ kind, onClose, isDownloadingDiagnostics, onDownloadDiagnostics }: HelpContactModalProps) {
   if (!kind) {
     return null;
   }
@@ -114,6 +116,23 @@ export function HelpContactModal({ kind, onClose }: HelpContactModalProps) {
         </div>
 
         <div className="help-modal-body">
+          {kind === "issues" ? (
+            <section className="help-modal-card modal-page-section">
+              <div className="modal-section-header">
+                <h3>Attach diagnostics</h3>
+                <p className="modal-section-copy">
+                  Download a JSON report with your active pose, skin and item images, settings,
+                  browser/GPU details, and recent errors. Attach it to your bug report along with
+                  reproduction steps. It may contain usernames and file names, so review it before
+                  sharing. Nothing is uploaded automatically.
+                </p>
+              </div>
+              <button className="toolbar-button" type="button" disabled={isDownloadingDiagnostics}
+                onClick={onDownloadDiagnostics}>
+                {isDownloadingDiagnostics ? "Preparing diagnostics..." : "Download Diagnostics"}
+              </button>
+            </section>
+          ) : null}
           <section className="help-modal-card modal-page-section">
             <div className="modal-section-header">
               <h3>{modalContent.guidanceTitle}</h3>
