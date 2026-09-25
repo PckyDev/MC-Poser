@@ -116,28 +116,23 @@ export function HelpContactModal({ kind, onClose, isDownloadingDiagnostics, onDo
         </div>
 
         <div className="help-modal-body">
-          {kind === "issues" ? (
-            <section className="help-modal-card modal-page-section">
-              <div className="modal-section-header">
-                <h3>Attach diagnostics</h3>
-                <p className="modal-section-copy">
-                  Download a JSON report with your active pose, skin and item images, settings,
-                  browser/GPU details, and recent errors. Attach it to your bug report along with
-                  reproduction steps. It may contain usernames and file names, so review it before
-                  sharing. Nothing is uploaded automatically.
-                </p>
-              </div>
-              <button className="toolbar-button" type="button" disabled={isDownloadingDiagnostics}
-                onClick={onDownloadDiagnostics}>
-                {isDownloadingDiagnostics ? "Preparing diagnostics..." : "Download Diagnostics"}
-              </button>
-            </section>
-          ) : null}
           <section className="help-modal-card modal-page-section">
             <div className="modal-section-header">
               <h3>{modalContent.guidanceTitle}</h3>
               <p className="modal-section-copy">{modalContent.guidanceCopy}</p>
             </div>
+            {kind === "issues" ? (
+              <>
+                <button
+                  className="toolbar-button"
+                  type="button"
+                  disabled={isDownloadingDiagnostics}
+                  onClick={onDownloadDiagnostics}
+                >
+                  {isDownloadingDiagnostics ? "Preparing diagnostics..." : "Download Diagnostics"}
+                </button>
+              </>
+            ) : null}
           </section>
 
           <section className="help-modal-card modal-page-section">

@@ -27,6 +27,9 @@ async function startWorkspace(page: Page) {
 async function download(page: Page) {
   const pending = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download Diagnostics", exact: true }).click();
+  const warning = page.getByRole("dialog", { name: "Download diagnostics?", exact: true });
+  await expect(warning.getByText(/Nothing is uploaded automatically/)).toBeVisible();
+  await warning.getByRole("button", { name: "Download JSON", exact: true }).click();
   const file = await pending;
   expect(file.suggestedFilename()).toMatch(/^mc-poser-diagnostics-.*\.json$/);
   return JSON.parse(await readFile((await file.path())!, "utf8"));
@@ -65,7 +68,10 @@ test("bug modal offers the same download with sharing guidance, ideas modal does
   await page.getByRole("button", { name: "Help", exact: true }).click();
   await page.getByRole("button", { name: "Report Bug/Issue", exact: true }).click();
   const modal = page.getByRole("dialog", { name: "Report a bug or issue" });
-  await expect(modal.getByText(/Nothing is uploaded automatically/)).toBeVisible();
+  await expect(modal.getByRole("heading", { name: "Attach diagnostics" })).toHaveCount(0);
+  const guidance = modal.locator("section").filter({ has: page.getByRole("heading", { name: "What helps most" }) });
+  await expect(guidance.getByRole("button", { name: "Download Diagnostics", exact: true })).toBeVisible();
+  await expect(modal.getByText(/Nothing is uploaded automatically/)).toHaveCount(0);
   const report = await download(page);
   expect(report.workspace.skin.label).toContain("diagnostic-skin");
   await modal.screenshot({ path: testInfo.outputPath("bug-report-diagnostics.png") });
@@ -73,6 +79,29 @@ test("bug modal offers the same download with sharing guidance, ideas modal does
   await page.getByRole("button", { name: "Help", exact: true }).click();
   await page.getByRole("button", { name: "Suggest Ideas", exact: true }).click();
   await expect(page.getByRole("button", { name: "Download Diagnostics", exact: true })).toHaveCount(0);
+});
+
+test("diagnostics warning cancels without downloading and restores the issue modal", async ({ page }, testInfo) => {
+  await startWorkspace(page);
+  const downloads: string[] = [];
+  page.on("download", (file) => downloads.push(file.suggestedFilename()));
+  await page.getByRole("button", { name: "Help", exact: true }).click();
+  await page.getByRole("button", { name: "Download Diagnostics", exact: true }).click();
+  const warning = page.getByRole("dialog", { name: "Download diagnostics?", exact: true });
+  await expect(warning).toBeVisible();
+  await expect(warning.getByRole("button", { name: "Cancel", exact: true })).toBeFocused();
+  await warning.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(warning).toHaveCount(0);
+  await page.getByRole("button", { name: "Help", exact: true }).click();
+  await page.getByRole("button", { name: "Report Bug/Issue", exact: true }).click();
+  const issue = page.getByRole("dialog", { name: "Report a bug or issue", exact: true });
+  await issue.getByRole("button", { name: "Download Diagnostics", exact: true }).click();
+  await expect(warning).toBeVisible();
+  await warning.screenshot({ path: testInfo.outputPath("diagnostics-warning.png") });
+  await page.keyboard.press("Escape");
+  await expect(warning).toHaveCount(0);
+  await expect(issue.getByRole("button", { name: "Download Diagnostics", exact: true })).toBeFocused();
+  expect(downloads).toEqual([]);
 });
 
 test("collection tolerates missing WebGL and failed assets without losing other data", async ({ page }) => {

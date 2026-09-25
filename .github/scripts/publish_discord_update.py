@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish the current MC Poser update and pushed commits to Discord."""
+"""Publish player-facing update notes without exposing raw commit messages."""
 
 from __future__ import annotations
 
@@ -14,7 +14,6 @@ from pathlib import Path
 
 
 APP_URL = "https://mcposer.pcky.dev"
-REPOSITORY_URL = "https://github.com/PckyDev/MC-Poser"
 BRAND_ICON_URL = "https://raw.githubusercontent.com/PckyDev/MC-Poser/main/brand/icon.jpg"
 
 
@@ -40,21 +39,20 @@ def commit_messages(event: dict) -> list[str]:
 
 
 def changelog(messages: list[str]) -> str:
+    # Only explicitly authored public copy belongs in Discord. Never fall back
+    # to commit titles/bodies, which can contain implementation and test details.
     changes = []
     for message in messages:
-        lines = [line.strip() for line in message.splitlines() if line.strip()]
-        if lines:
-            detail = ("\n  " + " ".join(lines[1:])) if len(lines) > 1 else ""
-            changes.append("• **" + lines[0] + "**" + detail)
+        for line in message.splitlines():
+            prefix = "Discord-Update:"
+            if line.strip().startswith(prefix):
+                note = line.strip()[len(prefix):].strip()
+                if note and note not in changes:
+                    changes.append(note)
+    if not changes:
+        return "A fresh update is available. Open MC Poser to try it out!"
+    changes = ["• " + note for note in changes]
     return "**What changed**\n" + "\n".join(changes)
-
-
-def compare_url(event: dict) -> str:
-    compare = str(event.get("compare", "")).strip()
-    if compare.startswith("https://"):
-        return compare
-    sha = os.environ.get("GITHUB_SHA", "").strip()
-    return f"{REPOSITORY_URL}/commit/{sha}" if sha else REPOSITORY_URL
 
 
 def main() -> None:
@@ -78,7 +76,6 @@ def main() -> None:
                 "color": 0x55A7FF,
                 "fields": [
                     {"name": "Try it", "value": f"[Open MC Poser]({APP_URL})", "inline": True},
-                    {"name": "Changes", "value": f"[View on GitHub]({compare_url(event)})", "inline": True},
                 ],
             }
         ],

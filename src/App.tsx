@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { SkinViewer } from "skinview3d";
+import { DiagnosticsWarningModal } from "./components/DiagnosticsWarningModal";
 import { collectDiagnostics, diagnosticText, embedDiagnosticAsset } from "./lib/diagnostics";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
 import {
@@ -2403,6 +2404,7 @@ export default function App() {
   const [status, setStatus] = useState("Booting editor viewport...");
   const [error, setError] = useState<string | null>(null);
   const [isDownloadingDiagnostics, setIsDownloadingDiagnostics] = useState(false);
+  const [isDiagnosticsWarningOpen, setIsDiagnosticsWarningOpen] = useState(false);
   const diagnosticsBusyRef = useRef(false);
   const [startupFileName, setStartupFileName] = useState("untitled-pose-01.mcpose");
   const [startupUsername, setStartupUsername] = useState(DEFAULT_USERNAME);
@@ -5850,7 +5852,7 @@ export default function App() {
       >
       <EditorTopbar
         isDownloadingDiagnostics={isDownloadingDiagnostics}
-        onDownloadDiagnostics={() => { void handleDownloadDiagnostics(); }}
+        onDownloadDiagnostics={() => setIsDiagnosticsWarningOpen(true)}
         canRedo={canRedo}
         canUndo={canUndo}
         isExportDisabled={isExportDisabled}
@@ -6036,10 +6038,20 @@ export default function App() {
 
       <HelpContactModal
         isDownloadingDiagnostics={isDownloadingDiagnostics}
-        onDownloadDiagnostics={() => { void handleDownloadDiagnostics(); }}
+        onDownloadDiagnostics={() => setIsDiagnosticsWarningOpen(true)}
         kind={helpContactModalKind}
         onClose={closeHelpContactModal}
       />
+
+      {isDiagnosticsWarningOpen ? (
+        <DiagnosticsWarningModal
+          onCancel={() => setIsDiagnosticsWarningOpen(false)}
+          onConfirm={() => {
+            setIsDiagnosticsWarningOpen(false);
+            void handleDownloadDiagnostics();
+          }}
+        />
+      ) : null}
 
       <HeldItemModal
         armId={heldItemModalArmId}

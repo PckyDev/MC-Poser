@@ -32,6 +32,8 @@ jobs:
             echo "configured=false" >> "$GITHUB_OUTPUT"
             echo "::notice::Add the DISCORD_WEBHOOK_URL repository secret to enable Discord updates."
           fi
-      - name: Send update changelog
+      - name: Check player-facing update formatting
+        run: python3 -m unittest discover -s .github/scripts -p "test_*.py"
+      - name: Send player-facing update notes
         if: steps.webhook.outputs.configured == 'true'
         run: python3 .github/scripts/publish_discord_update.py

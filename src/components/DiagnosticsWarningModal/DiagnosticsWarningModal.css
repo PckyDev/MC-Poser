@@ -1,0 +1,36 @@
+.diagnostics-warning-modal {
+  width: min(400px, calc(100vw - 2.4rem));
+  box-sizing: border-box;
+  max-height: calc(100vh - 2.4rem);
+  margin: auto;
+  padding: 1.2rem;
+  border: 1px solid var(--border-subtle);
+  background: #262c35;
+  color: inherit;
+  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.5);
+
+  &::backdrop {
+    background: rgba(10, 12, 15, 0.62);
+    backdrop-filter: blur(4px);
+  }
+
+  & .title {
+    margin: 0 0 0.75rem;
+    font-size: 1.1rem;
+  }
+
+  & .copy {
+    margin: 0;
+    color: var(--text-muted, #aab5c4);
+    font-size: 0.85rem;
+    line-height: 1.6;
+  }
+
+  & .actions {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 1rem;
+  }
+}
