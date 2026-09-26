@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest a way to make MC Poser better.
+title: "[Idea]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to do?
+      description: Describe the problem or workflow you want to improve.
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Your suggestion
+      description: Explain how you would like this to work. Mockups and examples are welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or workarounds
+      description: Have you tried another way to achieve this?

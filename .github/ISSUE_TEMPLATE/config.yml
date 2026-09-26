@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and community help
+    url: https://discord.pcky.dev
+    about: Join Pockyverse and visit the mc-poser channel.
+  - name: Security reporting guidance
+    url: https://github.com/PckyDev/MC-Poser/blob/main/SECURITY.md
+    about: Arrange private reporting instead of posting sensitive details publicly.

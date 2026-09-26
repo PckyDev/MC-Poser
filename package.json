@@ -19,9 +19,9 @@
     "type": "git",
     "url": "git+https://github.com/PckyDev/MC-Poser.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": ["minecraft", "skin", "pose-editor", "3d"],
+  "author": "PockyDev",
+  "license": "MIT",
   "type": "module",
   "bugs": {
     "url": "https://github.com/PckyDev/MC-Poser/issues"

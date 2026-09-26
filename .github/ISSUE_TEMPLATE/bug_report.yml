@@ -1,0 +1,43 @@
+name: Bug report
+description: Tell us what went wrong and how to reproduce it.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting an issue! Search existing issues first.
+        For security vulnerabilities, follow SECURITY.md instead of posting details here.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe what you expected and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Load a skin...
+        2. Change...
+        3. See...
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Browser and operating system
+      placeholder: "Chrome on Windows 11"
+    validations:
+      required: true
+  - type: textarea
+    id: avatar
+    attributes:
+      label: Skin and avatar settings
+      description: Include skin dimensions/source, avatar type, arm model, and hidden/flat/3D outer layer settings if relevant.
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Screenshots or diagnostics (optional)
+      description: Use Help > Download Diagnostics. Review before attaching; reports include active workspace images, names, and error text. Never attach secrets or someone else's private data.

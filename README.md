@@ -6,6 +6,9 @@ MC Poser is a browser-based editor for posing Minecraft skins in 3D. Load a skin
 
 [Live app](https://mcposer.pcky.dev) · [Support on Ko-Fi](https://ko-fi.com/pockydev) · [Report an issue](https://github.com/PckyDev/MC-Poser/issues)
 
+Use a desktop device with a modern browser and WebGL support. Mobile devices
+are not currently supported.
+
 ## Highlights
 
 - Load skins from Mojang username lookups or local PNG files.
@@ -42,7 +45,7 @@ MC Poser is a browser-based editor for posing Minecraft skins in 3D. Load a skin
 ### Install
 
 ```bash
-npm install
+npm ci
 ```
 
 ### Run locally
@@ -66,6 +69,42 @@ npm run preview
 ```
 
 `npm run preview` serves the static client only and does not include the `/api/skin` lookup route.
+
+### Deploy your own copy
+
+The project targets Cloudflare Pages. Use `npm run build` as the build command,
+`dist` as the output directory, and a supported Node.js version. The root
+`functions/` directory supplies `/api/skin`; a static-only host will not provide
+username lookup unless you implement that endpoint separately. PNG upload does
+not depend on username lookup.
+
+The app does not require a Discord webhook to run. The optional GitHub workflow
+uses a repository Actions secret named `DISCORD_WEBHOOK_URL` to publish update
+notes. Never put the webhook URL in a source file or a client-side variable.
+
+`"private": true` in `package.json` prevents accidental npm publication; it does
+not prevent hosting the app or publishing this repository's source.
+
+## Contributing and security
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, checks, and pull-request guidance.
+Community participation follows our [Code of Conduct](CODE_OF_CONDUCT.md).
+Use [SECURITY.md](SECURITY.md) for private vulnerability reporting. GitHub issues
+provide forms for bugs and ideas; community help is available in **#mc-poser**
+on [Pockyverse](https://discord.pcky.dev).
+
+CI checks type safety, the production build, browser regressions, and Discord
+update formatting on pull requests and pushes to `main`.
+
+## Licensing and attribution
+
+Original MC Poser code is available under the [MIT License](LICENSE).
+
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for dependency and asset
+notices. The bundled Minecraft item textures are excluded from the MIT license;
+their redistribution terms still need maintainer review.
+MC Poser is an independent project, not an official Minecraft product and not
+approved by or associated with Mojang or Microsoft.
 
 ## Regression tests
 
