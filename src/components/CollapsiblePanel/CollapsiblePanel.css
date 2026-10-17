@@ -1,0 +1,22 @@
+.collapsible-panel {
+  flex-shrink: 0;
+  max-height: calc(100% - 8rem);
+
+  & .heading { margin: 0; flex-shrink: 0; }
+  & .trigger {
+    appearance: none;
+    border: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    width: 100%;
+    border-radius: 0;
+    color: inherit;
+    font-size: 0.96rem;
+    font-weight: 600;
+    text-align: left;
+    align-items: center;
+    cursor: pointer;
+    &:hover { background: rgba(255, 255, 255, 0.04); }
+    &:focus-visible { outline: 2px solid var(--accent, #ffad55); outline-offset: -3px; }
+  }
+  & .body { min-height: 0; overflow: auto; }
+}

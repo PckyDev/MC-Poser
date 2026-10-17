@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { SkinViewer } from "skinview3d";
+import { normalizeRenderAppearance, type RenderAppearance } from "./lib/renderAppearance";
+import { createStylizedMaterial, createStylizedRenderer, prepareStylizedGeometry } from "./lib/stylizedRenderer";
+import { syncStylizedAvatarGeometry } from "./lib/stylizedAvatar";
+import { fitVisibleAvatar } from "./lib/exportFraming";
 import { DiagnosticsWarningModal } from "./components/DiagnosticsWarningModal";
 import { collectDiagnostics, diagnosticText, embedDiagnosticAsset } from "./lib/diagnostics";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
@@ -129,6 +133,7 @@ import {
 } from "./utils/heldItems";
 
 type WorkspaceDocument = {
+  appearance: RenderAppearance;
   id: string;
   poseFileName: string;
   fileHandle: WorkspaceFileHandle | null;
@@ -149,6 +154,7 @@ type WorkspaceDocument = {
 type DocumentHistorySnapshot = Pick<
   WorkspaceDocument,
   | "advancedArmCapTextureOffsets"
+  | "appearance"
   | "avatarType"
   | "heldItems"
   | "pose"
@@ -173,6 +179,7 @@ type DocumentUpdateOptions = {
 };
 
 type ImportedWorkspaceFile = {
+  appearance?: unknown;
   version?: unknown;
   poseFileName?: unknown;
   advancedArmCapTextureOffsets?: unknown;
@@ -190,6 +197,7 @@ type ImportedWorkspaceFile = {
 };
 
 type SerializableWorkspaceFile = {
+  appearance: RenderAppearance;
   version: 2;
   poseFileName: string;
   advancedArmCapTextureOffsets: AdvancedArmCapTextureOffsets;
@@ -224,7 +232,7 @@ const PNG_DATA_URL_PREFIX = "data:image/png;base64,";
 const SHARE_FILE_TYPES: readonly ExportFileType[] = ["png", "jpg", "webp"];
 const SHARE_MODEL_PREFERENCES: readonly ModelPreference[] = ["default", "slim", "auto-detect"];
 const SHARE_ARM_MODELS: readonly ArmModel[] = ["default", "slim"];
-const SHARE_AVATAR_TYPES: readonly AvatarType[] = ["default", "bobblehead", "advanced"];
+const SHARE_AVATAR_TYPES: readonly AvatarType[] = ["default", "bobblehead", "advanced", "stylized"];
 const HELD_ITEM_ADJUSTMENT_KEYS = [
   "offsetX",
   "offsetY",
@@ -299,9 +307,10 @@ type SharedProjectPayload =
       SharedSkinPayload | null,
       -1 | 0 | 1,
       0 | 1 | 2,
-      0 | 1 | 2,
+      0 | 1 | 2 | 3,
       SharedHeldItemsPayload,
       (0 | 1)?,
+      RenderAppearance?,
     ];
 
 type SharedExportSettingsPayload = readonly [
@@ -378,6 +387,7 @@ type OuterLayerVoxelMeshes = Partial<Record<PoseBoneId, Mesh>>;
 type HeldItemMeshes = Partial<Record<HeldItemArmId, Group>>;
 
 type ViewportMaterialVariants = {
+  stylized: MeshMaterial | null;
   lit: MeshMaterial;
   unlit: MeshMaterial | null;
 };
@@ -1001,7 +1011,7 @@ function isModelPreference(value: unknown): value is ModelPreference {
 }
 
 function isAvatarType(value: unknown): value is AvatarType {
-  return value === "default" || value === "bobblehead" || value === "advanced";
+  return value === "default" || value === "bobblehead" || value === "advanced" || value === "stylized";
 }
 
 function isArmModel(value: unknown): value is ArmModel {
@@ -1662,7 +1672,8 @@ function exportFileTypeFromShareCode(value: unknown): ExportFileType {
     : "png";
 }
 
-function avatarTypeToShareCode(value: AvatarType): 0 | 1 | 2 {
+function avatarTypeToShareCode(value: AvatarType): 0 | 1 | 2 | 3 {
+  if (value === "stylized") return 3;
   if (value === "bobblehead") {
     return 1;
   }
@@ -1967,6 +1978,7 @@ function encodeWorkspaceForShare(
     avatarTypeToShareCode(workspaceFile.avatarType),
     encodeShareHeldItems(workspaceFile.heldItems),
     workspaceFile.showHeldItems ? 1 : 0,
+    workspaceFile.appearance,
   ];
 }
 
@@ -2012,6 +2024,7 @@ function decodeSharedProjectPayload(payload: unknown): ImportedWorkspaceFile {
     showOuterLayer: sharePayload[5] !== 0,
     showOuterLayerIn3d: sharePayload[6] === 1,
     showHeldItems: sharePayload[12] !== 0,
+    appearance: normalizeRenderAppearance(sharePayload[13]),
     resolvedModel,
     uploadModel: modelPreferenceFromShareCode(sharePayload[9]),
     avatarType: avatarTypeFromShareCode(sharePayload[10]),
@@ -2343,6 +2356,7 @@ function createWorkspaceDocument(
   overrides: Partial<Omit<WorkspaceDocument, "id" | "poseFileName">> = {},
 ): WorkspaceDocument {
   return {
+    appearance: normalizeRenderAppearance(overrides.appearance),
     id: globalThis.crypto?.randomUUID?.() ?? `doc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     poseFileName: normalizePoseFileName(rawName),
     fileHandle: overrides.fileHandle ?? null,
@@ -2376,6 +2390,9 @@ export default function App() {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const viewportGizmoCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewerRef = useRef<SkinViewer | null>(null);
+  const stylizedRendererRef = useRef<ReturnType<typeof createStylizedRenderer> | null>(null);
+  const appearanceRef = useRef(initialDocument.appearance);
+  const styledAvatarTypeRef = useRef(initialDocument.avatarType);
   const rotationGizmoRef = useRef<TransformControls | null>(null);
   const rotationGizmoBindingRef = useRef<RotationGizmoBinding | null>(null);
   const rotationGizmoDraftPoseRef = useRef<PoseState | null>(null);
@@ -2446,6 +2463,8 @@ export default function App() {
   const viewportLightingModeRef = useRef<ViewportLightingMode>("unlit");
 
   const activeDocument = documents.find((document) => document.id === activeDocumentId) ?? documents[0]!;
+  const appearance = activeDocument.appearance;
+  appearanceRef.current = appearance;
   const {
     poseFileName,
     advancedArmCapTextureOffsets,
@@ -2590,7 +2609,7 @@ export default function App() {
     return () => {
       isCancelled = true;
     };
-  }, [avatarType, exportSettings, isExportModalOpen, skin, viewerReady]);
+  }, [appearance, avatarType, exportSettings, isExportModalOpen, skin, viewerReady]);
 
   function releaseDocumentUploadSkin(document: WorkspaceDocument): void {
     const currentSkin = document.skin;
@@ -2614,6 +2633,7 @@ export default function App() {
     document: WorkspaceDocument,
   ): DocumentHistorySnapshot {
     return {
+      appearance: document.appearance,
       advancedArmCapTextureOffsets: document.advancedArmCapTextureOffsets,
       avatarType: document.avatarType,
       heldItems: document.heldItems,
@@ -2633,6 +2653,7 @@ export default function App() {
   ): boolean {
     return (
       first.advancedArmCapTextureOffsets === second.advancedArmCapTextureOffsets &&
+      first.appearance === second.appearance &&
       first.avatarType === second.avatarType &&
       first.heldItems === second.heldItems &&
       first.pose === second.pose &&
@@ -2892,6 +2913,15 @@ export default function App() {
     rawName: string,
     overrides: Partial<Omit<WorkspaceDocument, "id" | "poseFileName">> = {},
   ): WorkspaceDocument {
+    // Imports supply normalized appearance explicitly; keep their saved choices.
+    if (overrides.avatarType === "stylized" && overrides.appearance === undefined) {
+      overrides = {
+        ...overrides,
+        appearance: { ...normalizeRenderAppearance(overrides.appearance), mode: "stylized" },
+        showOuterLayer: true,
+        showOuterLayerIn3d: true,
+      };
+    }
     const nextDocument = createWorkspaceDocument(rawName, overrides);
 
     if (!hasEnteredWorkspace && documents.length === 1) {
@@ -2957,6 +2987,7 @@ export default function App() {
     }
 
     const nextVariants: ViewportMaterialVariants = {
+      stylized: null,
       lit: mesh.material,
       unlit: null,
     };
@@ -2975,9 +3006,11 @@ export default function App() {
     lightingMode: ViewportLightingMode,
   ): void {
     const lightingPreset = VIEWPORT_LIGHTING_PRESETS[lightingMode];
+    const isStylized = appearanceRef.current.mode === "stylized";
+    stylizedRendererRef.current?.setAppearance(appearanceRef.current);
 
-    viewer.globalLight.intensity = lightingPreset.globalLightIntensity;
-    viewer.cameraLight.intensity = lightingPreset.cameraLightIntensity;
+    viewer.globalLight.intensity = isStylized ? 0.32 : lightingPreset.globalLightIntensity;
+    viewer.cameraLight.intensity = isStylized ? 0 : lightingPreset.cameraLightIntensity;
 
     viewer.playerObject.traverse((object) => {
       if (!(object instanceof Mesh)) {
@@ -2988,15 +3021,46 @@ export default function App() {
 
       if (
         object.material !== materialVariants.lit &&
-        object.material !== materialVariants.unlit
+        object.material !== materialVariants.unlit &&
+        object.material !== materialVariants.stylized
       ) {
         disposeMaterialInstances(materialVariants.unlit);
+        disposeMaterialInstances(materialVariants.stylized);
+        materialVariants.stylized = null;
         materialVariants.lit = object.material;
         materialVariants.unlit = null;
       }
 
+      object.castShadow = isStylized;
+      object.receiveShadow = isStylized;
+      syncStylizedAvatarGeometry(object, avatarTypeRef.current === "stylized");
+      if (isStylized) {
+        prepareStylizedGeometry(object.geometry);
+        materialVariants.stylized ??= Array.isArray(materialVariants.lit)
+          ? materialVariants.lit.map(createStylizedMaterial)
+          : createStylizedMaterial(materialVariants.lit);
+        object.material = materialVariants.stylized;
+        // skinview3d can replace the source map without replacing its material.
+        const originals = collectMaterialInstances(materialVariants.lit);
+        collectMaterialInstances(materialVariants.stylized).forEach((material, index) => {
+          const source = originals[index] as MeshStandardMaterial | undefined;
+          if (source && (material as MeshStandardMaterial).map !== source.map) {
+            (material as MeshStandardMaterial).map = source.map;
+            material.needsUpdate = true;
+          }
+        });
+        return;
+      }
       if (lightingMode === "unlit") {
         materialVariants.unlit ??= createUnlitMaterialVariant(materialVariants.lit);
+        const originals = collectMaterialInstances(materialVariants.lit);
+        collectMaterialInstances(materialVariants.unlit).forEach((material, index) => {
+          const source = originals[index] as MeshStandardMaterial | undefined;
+          if (source && (material as MeshBasicMaterial).map !== source.map) {
+            (material as MeshBasicMaterial).map = source.map;
+            material.needsUpdate = true;
+          }
+        });
         object.material = materialVariants.unlit;
         return;
       }
@@ -3019,11 +3083,12 @@ export default function App() {
         return;
       }
 
-      if (object.material === materialVariants.unlit) {
+      if (object.material === materialVariants.unlit || object.material === materialVariants.stylized) {
         object.material = materialVariants.lit;
       }
 
       disposeMaterialInstances(materialVariants.unlit);
+      disposeMaterialInstances(materialVariants.stylized);
       clearViewportMaterialVariants(object);
     });
   }
@@ -3037,6 +3102,7 @@ export default function App() {
       mesh.material,
       materialVariants?.lit ?? null,
       materialVariants?.unlit ?? null,
+      materialVariants?.stylized ?? null,
     );
     clearViewportMaterialVariants(mesh);
   }
@@ -3119,7 +3185,7 @@ export default function App() {
         : null
       : null;
 
-    if (avatarType === "advanced" && isAdvancedAvatarActive(viewer)) {
+    if ((avatarType === "advanced" || avatarType === "stylized") && isAdvancedAvatarActive(viewer)) {
       const advancedOutlineObjects = getAdvancedAvatarOutlineObjects(viewer, boneId);
 
       if (advancedOutlineObjects && advancedOutlineObjects.length > 0) {
@@ -3175,7 +3241,7 @@ export default function App() {
     viewer: SkinViewer,
     armId: HeldItemArmId,
   ): Object3D {
-    if (avatarType === "advanced" && isAdvancedAvatarActive(viewer)) {
+    if ((avatarType === "advanced" || avatarType === "stylized") && isAdvancedAvatarActive(viewer)) {
       return getAdvancedAvatarHandAnchor(viewer, armId) ?? viewer.playerObject.skin[armId];
     }
 
@@ -3343,7 +3409,7 @@ export default function App() {
   function rebuildOuterLayerVoxelMeshes(viewer: SkinViewer): void {
     disposeOuterLayerVoxelMeshes();
 
-    if (avatarType === "advanced") {
+    if (avatarType === "advanced" || avatarType === "stylized") {
       return;
     }
 
@@ -3410,7 +3476,7 @@ export default function App() {
     isVisible: boolean,
     is3dOuterLayerEnabled: boolean,
   ): void {
-    if (avatarType === "advanced") {
+    if (avatarType === "advanced" || avatarType === "stylized") {
       setAdvancedAvatarOuterLayerVisibility(viewer, isVisible, is3dOuterLayerEnabled);
 
       Object.values(outerLayerVoxelMeshesRef.current).forEach((voxelMesh) => {
@@ -3443,6 +3509,7 @@ export default function App() {
     overridePoseFileName = documentToSerialize.poseFileName,
   ): Promise<SerializableWorkspaceFile> {
     return {
+      appearance: normalizeRenderAppearance(documentToSerialize.appearance),
       version: 2,
       poseFileName: overridePoseFileName,
       advancedArmCapTextureOffsets: cloneAdvancedArmCapTextureOffsets(
@@ -4342,8 +4409,10 @@ export default function App() {
     let viewportGizmo: ViewportGizmo | null = createViewportGizmo(gizmoCanvas);
     const rotationGizmo = new TransformControls(viewer.camera, canvas);
     const renderViewer = viewer.render.bind(viewer);
+    stylizedRendererRef.current = createStylizedRenderer(viewer);
 
     viewer.render = () => {
+      stylizedRendererRef.current?.beforeRender();
       renderViewer();
       viewportGizmo?.render(viewer);
     };
@@ -4605,6 +4674,8 @@ export default function App() {
           });
         });
       });
+      stylizedRendererRef.current?.dispose();
+      stylizedRendererRef.current = null;
       viewer.dispose();
       viewerRef.current = null;
       (window as DebugWindow).__MC_POSER_DEBUG_HELPERS__ = undefined;
@@ -4622,7 +4693,7 @@ export default function App() {
     applyViewportLighting(viewer, viewportLightingMode);
     viewer.render();
     publishDebugState(viewer);
-  }, [viewportLightingMode]);
+  }, [viewportLightingMode, appearance]);
 
   useEffect(() => {
     const viewer = viewerRef.current;
@@ -4656,7 +4727,7 @@ export default function App() {
     syncRotationGizmo();
     viewer.render();
     publishDebugState(viewer);
-  }, [showOuterLayer, showOuterLayerIn3d, resolvedModel, viewportLightingMode]);
+  }, [showOuterLayer, showOuterLayerIn3d, resolvedModel, viewportLightingMode, appearance]);
 
   useEffect(() => {
     const viewer = viewerRef.current;
@@ -4665,8 +4736,10 @@ export default function App() {
       return;
     }
 
+    disposeViewerViewportMaterialVariants(viewer);
     setAdvancedArmCapTextureOffsets(viewer, advancedArmCapTextureOffsets);
     applyOuterLayerPresentation(viewer, showOuterLayer, showOuterLayerIn3d);
+    applyViewportLighting(viewer, viewportLightingModeRef.current);
     syncSelectedOutline();
     syncRotationGizmo();
     viewer.render();
@@ -4785,9 +4858,14 @@ export default function App() {
       return;
     }
 
+    if (styledAvatarTypeRef.current !== avatarType) {
+      disposeViewerViewportMaterialVariants(viewer);
+      styledAvatarTypeRef.current = avatarType;
+    }
     applyAvatarType(viewer, avatarType);
     applyPose(viewer, pose);
     applyOuterLayerPresentation(viewer, showOuterLayer, showOuterLayerIn3d);
+    applyViewportLighting(viewer, viewportLightingModeRef.current);
     syncSelectedOutline();
     syncRotationGizmo();
     viewer.render();
@@ -5186,6 +5264,7 @@ export default function App() {
           parsedFile.advancedArmCapTextureOffsets,
         ),
         heldItems: normalizeImportedHeldItems(parsedFile.heldItems),
+        appearance: normalizeRenderAppearance(parsedFile.appearance),
         pose: normalizeImportedPose(parsedFile.pose),
         skin: importedSkin,
         selectedPoseSelection: normalizeImportedSelection(
@@ -5369,7 +5448,7 @@ export default function App() {
         return () => {
           isCancelled = true;
         };
-      }, [avatarType, isLoading, shareLandingMode, sharedImageSettings, skin, viewerReady]);
+      }, [appearance, avatarType, isLoading, shareLandingMode, sharedImageSettings, skin, viewerReady]);
   function handleSelectBone(nextBoneId: PoseBoneId): void {
     updateDocument(activeDocumentId, (currentDocument) => ({
       ...currentDocument,
@@ -5481,7 +5560,8 @@ export default function App() {
       viewer.camera.updateProjectionMatrix();
 
       if (!playerBounds.isEmpty()) {
-        const center = playerBounds.getCenter(new Vector3());
+        const visibleFit = fitVisibleAvatar(viewer.playerObject, viewer.camera);
+        const center = visibleFit?.center ?? playerBounds.getCenter(new Vector3());
         const cameraOffsetDirection = savedCameraPosition
           .clone()
           .sub(savedControlsTarget);
@@ -5493,7 +5573,7 @@ export default function App() {
         cameraOffsetDirection.normalize();
 
         const fittedDistance = Math.max(
-          calculateCameraFitDistance(playerBounds, center, viewer.camera) * 1.08,
+          visibleFit?.distance ?? calculateCameraFitDistance(playerBounds, center, viewer.camera) * 1.08,
           1,
         );
 
@@ -5787,6 +5867,11 @@ export default function App() {
     updateDocument(activeDocumentId, (currentDocument) => ({
       ...currentDocument,
       avatarType: nextAvatarType,
+      ...(nextAvatarType === "stylized" ? {
+        appearance: { ...currentDocument.appearance, mode: "stylized" as const },
+        showOuterLayer: true,
+        showOuterLayerIn3d: true,
+      } : {}),
       selectedPoseSelection:
         currentDocument.selectedPoseSelection.kind === "joint" &&
         !supportedPoseKeys.has(currentDocument.selectedPoseSelection.id)
@@ -5903,12 +5988,18 @@ export default function App() {
           stageRef={stageRef}
           canvasRef={canvasRef}
           gizmoCanvasRef={viewportGizmoCanvasRef}
+          isStylized={appearance.mode === "stylized"}
           isLoading={isLoading}
           viewportLightingMode={viewportLightingMode}
           onViewportLightingModeChange={setViewportLightingMode}
         />
 
         <RightSidebar
+          appearance={appearance}
+          onAppearanceChange={(nextAppearance) => {
+            updateDocument(activeDocumentId, (document) => ({ ...document, appearance: nextAppearance }),
+              { historyGroup: "appearance" });
+          }}
           avatarType={avatarType}
           heldItems={heldItems}
           isArmCapTextureMapAvailable={Boolean(skin && resolvedModel)}

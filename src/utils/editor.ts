@@ -34,6 +34,7 @@ const AVATAR_TYPE_DIMENSIONS: Record<
     bodyScale: 1,
     headScale: 1,
   },
+  stylized: { bodyScale: 1, headScale: 1.05 },
 };
 
 export function clonePose(pose: PoseState): PoseState {
@@ -152,6 +153,7 @@ export function applyAvatarType(viewer: SkinViewer, avatarType: AvatarType): voi
   const skin = viewer.playerObject.skin;
   const torsoJointRig = ensureTorsoJointRig(viewer);
   const { bodyScale, headScale } = AVATAR_TYPE_DIMENSIONS[avatarType];
+  syncAdvancedAvatarRig(viewer, avatarType === "advanced" || avatarType === "stylized");
 
   torsoJointRig.root.rotation.set(0, 0, 0);
   torsoJointRig.root.position.set(0, -12 * bodyScale, 0);
@@ -170,13 +172,24 @@ export function applyAvatarType(viewer: SkinViewer, avatarType: AvatarType): voi
   skin.leftLeg.position.set(1.9 * bodyScale, -12 * bodyScale, -0.1 * bodyScale);
   skin.rightLeg.position.set(-1.9 * bodyScale, -12 * bodyScale, -0.1 * bodyScale);
 
-  syncAdvancedAvatarRig(viewer, avatarType === "advanced");
-
-  if (avatarType === "advanced") {
+  if (avatarType === "advanced" || avatarType === "stylized") {
     skin.body.position.set(0, 6 * bodyScale, 0);
     skin.head.position.set(0, 6 * bodyScale, 0);
-    skin.leftArm.position.set(5 * bodyScale, 6 * bodyScale, 0);
-    skin.rightArm.position.set(-5 * bodyScale, 6 * bodyScale, 0);
+    skin.leftArm.position.set(5 * bodyScale, 4 * bodyScale, 0);
+    skin.rightArm.position.set(-5 * bodyScale, 4 * bodyScale, 0);
+  }
+  if (avatarType === "stylized") {
+    // Head and arms inherit the torso scale through the articulated spine.
+    skin.body.scale.set(0.98, 1, 1.04);
+    skin.head.scale.set(1.05 / 0.98, 1.05, 1.05 / 1.04);
+    skin.leftArm.scale.set(1.08 / 0.98, 1, 1.08 / 1.04);
+    skin.rightArm.scale.copy(skin.leftArm.scale);
+    skin.leftArm.position.x = 5.05;
+    skin.rightArm.position.x = -5.05;
+    skin.leftLeg.scale.set(1.04, 1, 1.08);
+    skin.rightLeg.scale.copy(skin.leftLeg.scale);
+    skin.leftLeg.position.x = 2.25;
+    skin.rightLeg.position.x = -2.25;
   }
 }
 
@@ -185,6 +198,7 @@ export function formatPresetName(value: string): string {
 }
 
 export function formatAvatarTypeLabel(value: AvatarType): string {
+  if (value === "stylized") return "Stylized";
   if (value === "bobblehead") {
     return "Bobblehead";
   }

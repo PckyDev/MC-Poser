@@ -7,6 +7,7 @@ type ViewportPanelProps = {
   canvasRef: RefObject<HTMLCanvasElement | null>;
   gizmoCanvasRef: RefObject<HTMLCanvasElement | null>;
   isLoading: boolean;
+  isStylized: boolean;
   viewportLightingMode: "lit" | "unlit";
   onViewportLightingModeChange: (mode: "lit" | "unlit") => void;
 };
@@ -16,6 +17,7 @@ export function ViewportPanel({
   canvasRef,
   gizmoCanvasRef,
   isLoading,
+  isStylized,
   viewportLightingMode,
   onViewportLightingModeChange,
 }: ViewportPanelProps) {
@@ -34,7 +36,8 @@ export function ViewportPanel({
               type="button"
               aria-label="Use lit viewport"
               aria-pressed={viewportLightingMode === "lit"}
-              title="Lit view"
+              disabled={isStylized}
+              title={isStylized ? "Stylized uses studio lighting. Switch to Classic to change this." : "Lit view"}
               onClick={() => onViewportLightingModeChange("lit")}
             >
               <FontAwesomeIcon icon={faLightbulb} />
@@ -48,7 +51,8 @@ export function ViewportPanel({
               type="button"
               aria-label="Use unlit viewport"
               aria-pressed={viewportLightingMode === "unlit"}
-              title="Unlit view"
+              disabled={isStylized}
+              title={isStylized ? "Stylized uses studio lighting. Switch to Classic to change this." : "Unlit view"}
               onClick={() => onViewportLightingModeChange("unlit")}
             >
               <FontAwesomeIcon icon={faMoon} />

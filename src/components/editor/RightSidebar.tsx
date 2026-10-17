@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import { CollapsiblePanel } from "../CollapsiblePanel";
+import { AppearanceControls } from "../AppearanceControls";
+import type { RenderAppearance } from "../../lib/renderAppearance";
 
 import { getPoseBones } from "../../config/pose";
 import type {
@@ -83,6 +86,8 @@ function formatHeldItemAdjustmentValue(field: HeldItemAdjustmentField, value: nu
 }
 
 type RightSidebarProps = {
+  appearance: RenderAppearance;
+  onAppearanceChange: (value: RenderAppearance) => void;
   avatarType: AvatarType;
   heldItems: HeldItemsState;
   isArmCapTextureMapAvailable: boolean;
@@ -103,6 +108,8 @@ type RightSidebarProps = {
 };
 
 export function RightSidebar({
+  appearance,
+  onAppearanceChange,
   avatarType,
   heldItems,
   isArmCapTextureMapAvailable,
@@ -457,11 +464,11 @@ export function RightSidebar({
                     onChange={(event) => onUpdatePose(field.key, Number(event.target.value))}
                   />
 
-                  {avatarType === "advanced" && field.key === "leftElbowPitch"
+                  {(avatarType === "advanced" || avatarType === "stylized") && field.key === "leftElbowPitch"
                     ? renderArmCapTextureControls("leftArm")
                     : null}
 
-                  {avatarType === "advanced" && field.key === "rightElbowPitch"
+                  {(avatarType === "advanced" || avatarType === "stylized") && field.key === "rightElbowPitch"
                     ? renderArmCapTextureControls("rightArm")
                     : null}
                 </div>
@@ -473,14 +480,9 @@ export function RightSidebar({
         </div>
       </section>
 
-      <section className="editor-panel">
-        <div className="panel-heading">
-          <div>
-            <h2>Render options</h2>
-          </div>
-        </div>
-
+      <CollapsiblePanel title="Render options">
         <div className="panel-content panel-content--stacked">
+          <AppearanceControls value={appearance} onChange={onAppearanceChange} />
           <label className="toggle-row">
             <span>Show outer layer</span>
             <input
@@ -508,7 +510,7 @@ export function RightSidebar({
             />
           </label>
         </div>
-      </section>
+      </CollapsiblePanel>
     </aside>
   );
 }

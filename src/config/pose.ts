@@ -176,7 +176,7 @@ export const POSE_BONES: PoseBoneConfig[] = [
 ];
 
 export function getPoseBones(avatarType: AvatarType): PoseBoneConfig[] {
-  if (avatarType === "advanced") {
+  if (avatarType === "advanced" || avatarType === "stylized") {
     return POSE_BONES;
   }
 

@@ -32,6 +32,7 @@ const AVATAR_TYPE_OPTIONS: Array<{
     label: "Advanced",
     value: "advanced",
   },
+  { description: "Cartoony proportions with articulated limbs. Enables Stylized rendering and 3D outer layers.", label: "Stylized", value: "stylized" },
 ];
 
 type DocumentModalPage = (typeof DOCUMENT_MODAL_PAGES)[number]["id"];
@@ -208,7 +209,7 @@ export function DocumentModal({
                 <div className="modal-section-header">
                   <h3>Avatar type</h3>
                   <p className="modal-section-copy">
-                    Swap between standard Minecraft proportions and a bobblehead-style body at any time.
+                    Choose standard, bobblehead, articulated, or chunky stylized proportions at any time.
                   </p>
                 </div>
 

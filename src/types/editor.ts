@@ -1,6 +1,6 @@
 export type ModelPreference = "default" | "slim" | "auto-detect";
 export type ArmModel = "default" | "slim";
-export type AvatarType = "default" | "bobblehead" | "advanced";
+export type AvatarType = "default" | "bobblehead" | "advanced" | "stylized";
 export type HeldItemArmId = "leftArm" | "rightArm";
 export type HeldItemPresetId =
   | "apple"

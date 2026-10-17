@@ -864,6 +864,9 @@ function buildLimbRig(
 
   const root = new Group();
   root.name = `${part.name}-advanced-rig`;
+  // Match the base avatar's shoulder: two pixels below the arm's top.
+  // Move the whole articulated chain, including its elbow and hand anchor.
+  root.position.y = armCapRegions ? 2 : 0;
   root.visible = false;
   root.add(upperInnerMesh, upperOuterMesh, joint);
   part.add(root);
@@ -1421,6 +1424,8 @@ export function syncAdvancedAvatarRig(viewer: SkinViewer, isAdvanced: boolean): 
 
   const state = ensureAdvancedRig(viewer);
   const skin = viewer.playerObject.skin;
+  state.leftLegRig.joint.scale.set(1, 1, 1);
+  state.rightLegRig.joint.scale.copy(state.leftLegRig.joint.scale);
 
   state.torsoRig.root.visible = true;
   state.leftArmRig.root.visible = true;
@@ -1451,8 +1456,8 @@ export function syncAdvancedAvatarRig(viewer: SkinViewer, isAdvanced: boolean): 
 
   skin.body.position.set(0, 6, 0);
   skin.head.position.set(0, 6, 0);
-  skin.leftArm.position.set(5, 6, 0);
-  skin.rightArm.position.set(-5, 6, 0);
+  skin.leftArm.position.set(5, 4, 0);
+  skin.rightArm.position.set(-5, 4, 0);
 }
 
 export function setAdvancedArmCapTextureOffsets(

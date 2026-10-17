@@ -13,10 +13,12 @@ are not currently supported.
 
 - Load skins from Mojang username lookups or local PNG files.
 - Pose characters with sliders, presets, and in-viewport rotation gizmos.
-- Switch between default, bobblehead, and advanced avatar rigs.
+- Switch between default, bobblehead, advanced, and stylized avatar rigs.
 - Bend the lower torso, spine, elbows, and knees with per-joint controls.
 - Support classic, slim, and auto-detect arm models.
 - Toggle the outer layer, including voxel-style 3D outer layer rendering.
+- Choose Classic or Stylized rendering, with soft edge highlights, studio shadows,
+  warm surface-edge lighting, and adjustable brightness and warmth.
 - Export PNG, JPG, or WebP renders with custom resolution and background settings.
 - Generate compact share links for full projects and rendered image outputs.
 
@@ -26,6 +28,36 @@ are not currently supported.
 2. Choose an avatar type and arm model.
 3. Pose the character in the viewport or inspector.
 4. Export a render or share the scene with a link.
+
+### Stylized rendering
+
+Under **Render options**, choose **Stylized** and adjust Brightness, Warmth, and
+Glow (soft rear-edge highlights: higher values increase their strength and spread inward across the surface).
+Highlights are softened independently of the crisp avatar surfaces and stay inside
+the exported silhouette. Enable **3D outer layer** for raised skin details. The style follows the
+camera and is included in image exports, saved `.mcpose` files, undo/redo, and
+share links. Existing files open in Classic unless they explicitly save a style.
+Classic's lit/unlit controls are available again when switching back.
+
+Rendering style and avatar type are separate choices. For a cartoon silhouette,
+selecting the Stylized avatar automatically enables Stylized rendering and 3D
+outer layers. You can change those settings afterward; opening a saved pose keeps
+its saved settings. Click **Render options** to collapse the panel and give the
+part inspector more space.
+
+For the stylized proportions,
+choose **Document > Avatar Type > Stylized**: it has a slimmer torso and arms,
+a larger relative head, legs that widen toward the feet, and subtle bevels, while retaining
+the Advanced rig's elbow, knee, and spine controls. Switching back restores the
+original proportions. The studio lighting uses soft shadows and color-preserving
+shading with warm grazing highlights. Outer layers keep their original thickness.
+Advanced and Stylized arms rotate from the shoulder, two pixels below the top,
+with their elbows and hand attachments following the same articulated chain.
+Exports fit the visible model rather than hidden original limbs.
+
+The skin's artwork is preserved; arbitrary hand-sculpted clothing and hair from
+reference illustrations are not recreated automatically. Extra geometry and
+lighting can be more demanding on older graphics hardware.
 
 ## Built With
 
@@ -117,7 +149,7 @@ npm run typecheck
 The head-underside suite generates asymmetric four-color PNG fixtures and tests the
 actual viewer meshes through Chromium. It covers modern classic/slim and legacy
 skins, 64px and 128px atlases, opaque and translucent hat pixels, PNG upload and
-mocked username lookup, all three avatar rigs, explicit classic/slim arms and
+mocked username lookup, all four avatar rigs, explicit classic/slim arms and
 upload auto-detection, and hidden/flat/3D outer layers (including switching back).
 Username lookups are mocked for reproducibility, not used as live Mojang API tests.
 Geometry probes check all four underside quadrants of both head and hat, including

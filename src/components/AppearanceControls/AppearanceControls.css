@@ -1,0 +1,9 @@
+.appearance-controls {
+  display: grid;
+  gap: 0.7rem;
+  & .mode { display: grid; gap: 0.5rem; }
+  & select { width: 100%; padding: 0.5rem; background: #20262e; color: #dfe5ed; border: 1px solid #48505c; }
+  & .control { display: grid; gap: 0.3rem; font-size: 0.8rem; }
+  & .control > span { display: flex; justify-content: space-between; }
+  & output { color: #aab5c4; }
+}

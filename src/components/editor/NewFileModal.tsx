@@ -27,6 +27,7 @@ const AVATAR_TYPE_OPTIONS: Array<{
     label: "Advanced",
     value: "advanced",
   },
+  { description: "Chunkier proportions and soft edges with articulated limbs.", label: "Stylized", value: "stylized" },
 ];
 
 type NewFileModalProps = {
