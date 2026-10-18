@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUpload, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { JavaItemImport } from "../JavaItemImport";
 
 import { HELD_ITEM_PRESETS, formatHeldItemArmLabel } from "../../utils/heldItems";
 import type { HeldItem, HeldItemArmId, HeldItemPresetId } from "../../types/editor";
 
-type HeldItemSourceTab = "preset" | "upload";
+type HeldItemSourceTab = "preset" | "upload" | "java";
 
 type HeldItemModalProps = {
   armId: HeldItemArmId | null;
@@ -14,6 +15,7 @@ type HeldItemModalProps = {
   onClose: () => void;
   onSelectPreset: (presetId: HeldItemPresetId) => void;
   onSelectUpload: (file: File) => void;
+  onSelectModel: (item: HeldItem) => void;
 };
 
 export function HeldItemModal({
@@ -23,6 +25,7 @@ export function HeldItemModal({
   onClose,
   onSelectPreset,
   onSelectUpload,
+  onSelectModel,
 }: HeldItemModalProps) {
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const [activeSourceTab, setActiveSourceTab] = useState<HeldItemSourceTab>("preset");
@@ -126,7 +129,7 @@ export function HeldItemModal({
           <div>
             <h2 id="held-item-modal-title">Choose a held item</h2>
             <p className="document-copy modal-copy">
-              Pick a preset voxel item or upload a PNG texture for the {armLabel.toLowerCase()}.
+              Pick a preset, PNG texture, or Java 3D model for the {armLabel.toLowerCase()}.
             </p>
           </div>
 
@@ -143,7 +146,7 @@ export function HeldItemModal({
         </div>
 
         <div className="item-modal-body">
-          <section className="startup-section modal-page-section">
+          <section className="startup-section modal-page-section" style={activeSourceTab === "java" ? { gridColumn: "1 / -1" } : undefined}>
             <div className="new-file-source-tabs" role="tablist" aria-label="Held item source options">
               <button
                 className={isPresetTab ? "new-file-source-tab is-active" : "new-file-source-tab"}
@@ -155,17 +158,19 @@ export function HeldItemModal({
                 Presets
               </button>
               <button
-                className={!isPresetTab ? "new-file-source-tab is-active" : "new-file-source-tab"}
+                className={activeSourceTab === "upload" ? "new-file-source-tab is-active" : "new-file-source-tab"}
                 type="button"
                 role="tab"
-                aria-selected={!isPresetTab}
+                aria-selected={activeSourceTab === "upload"}
                 onClick={() => setActiveSourceTab("upload")}
               >
                 Upload PNG
               </button>
+              <button className={activeSourceTab === "java" ? "new-file-source-tab is-active" : "new-file-source-tab"}
+                type="button" role="tab" aria-selected={activeSourceTab === "java"} onClick={()=>setActiveSourceTab("java")}>Java 3D Model</button>
             </div>
 
-            {isPresetTab ? (
+            {activeSourceTab === "java" ? <JavaItemImport onImport={onSelectModel} /> : isPresetTab ? (
               <div className="item-preset-grid">
                 {HELD_ITEM_PRESETS.map((preset) => (
                   <button
@@ -236,7 +241,7 @@ export function HeldItemModal({
             )}
           </section>
 
-          <aside className="item-modal-sidebar">
+          {activeSourceTab !== "java" ? <aside className="item-modal-sidebar">
             <section className="startup-section modal-page-section item-modal-preview-card">
               <div className="item-modal-preview-frame">
                 {isPresetTab || uploadedPreviewUrl ? (
@@ -258,7 +263,7 @@ export function HeldItemModal({
                 ) : null}
               </div>
             </section>
-          </aside>
+          </aside> : null}
         </div>
 
         <div className="document-footer modal-footer">
@@ -266,14 +271,14 @@ export function HeldItemModal({
             <button className="toolbar-button" type="button" onClick={onClose}>
               Cancel
             </button>
-            <button
+            {activeSourceTab !== "java" ? <button
               className="toolbar-button toolbar-button--accent"
               type="button"
               onClick={handleConfirm}
               disabled={!isPresetTab && !uploadedFile}
             >
               {confirmLabel}
-            </button>
+            </button> : null}
           </div>
         </div>
       </div>

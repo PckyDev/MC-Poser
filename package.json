@@ -1,6 +1,6 @@
 {
   "name": "mc-poser",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "description": "Pose Minecraft skins in 3D and export polished renders.",
   "scripts": {

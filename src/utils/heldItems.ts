@@ -220,7 +220,7 @@ export function isHeldItemPresetId(value: unknown): value is HeldItemPresetId {
 }
 
 export function isHeldItemSourceKind(value: unknown): value is HeldItemSourceKind {
-  return value === "preset" || value === "upload";
+  return value === "preset" || value === "upload" || value === "java";
 }
 
 export function canRevokeHeldItemSource(item: HeldItem | null): item is HeldItem {

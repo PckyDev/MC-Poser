@@ -236,7 +236,7 @@ export function RightSidebar({
         <div className="modal-section-header">
           <h3>Held item</h3>
           <p className="modal-section-copy">
-            Assign a voxelized item texture to the {formatHeldItemArmLabel(targetArmId).toLowerCase()}.
+              Assign a PNG item or Java 3D model to the {formatHeldItemArmLabel(targetArmId).toLowerCase()}.
           </p>
         </div>
 
@@ -279,7 +279,7 @@ export function RightSidebar({
                 <div>
                   <div className="section-header">Item controls</div>
                   <p className="panel-note">
-                    Adjust the item placement, rotation, scale, and voxel depth.
+                    {targetItem.sourceKind === "java" ? "Adjust placement relative to the model's hand settings. Reset restores its authored grip." : "Adjust the item placement, rotation, scale, and voxel depth."}
                   </p>
                 </div>
 
@@ -298,7 +298,7 @@ export function RightSidebar({
                   <div className="section-header">{section.title}</div>
 
                   <div className="slider-stack">
-                    {section.fields.map((field) => {
+                    {section.fields.filter(field => targetItem.sourceKind !== "java" || field.key !== "thickness").map((field) => {
                       const currentValue = targetItem.adjustments[field.key];
 
                       return (

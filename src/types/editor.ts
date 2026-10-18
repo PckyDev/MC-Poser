@@ -8,7 +8,7 @@ export type HeldItemPresetId =
   | "diamond"
   | "diamondPickaxe"
   | "diamondSword";
-export type HeldItemSourceKind = "preset" | "upload";
+export type HeldItemSourceKind = "preset" | "upload" | "java";
 
 export type HeldItemAdjustments = {
   offsetX: number;
@@ -74,6 +74,7 @@ export type PoseSelection =
   | { kind: "heldItem"; id: HeldItemArmId };
 
 export type HeldItem = {
+  javaModel?: import("../lib/javaItemModel").JavaItemAsset;
   adjustments: HeldItemAdjustments;
   detail: string;
   label: string;

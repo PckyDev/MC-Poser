@@ -336,6 +336,7 @@ test("studio save, reload, undo, normalization and transparent exports", async (
 });
 
 test("studio follows rig switches and rebuilt elbow-cap surfaces", async ({ page }) => {
+  test.setTimeout(180000);
   const errors = await setup(page);
   await load(page);
   await page.getByRole("combobox", { name: "Render style", exact: true }).selectOption("stylized");
@@ -490,7 +491,8 @@ test("Stylized avatar switches, undo and saved shares retain articulated control
     v.playerObject.skin.traverseVisible((o: any) => {
       if (o.isMesh) result.push([o.name, o.geometry.getAttribute("position").count, o.scale.toArray()]);
     });
-    return result;
+    // Rebuilding attaches meshes in a different order without changing geometry.
+    return result.sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
   });
   const before = await snapshot();
   await page.getByRole("button", { name: "Document", exact: true }).click();

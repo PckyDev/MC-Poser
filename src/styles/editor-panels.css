@@ -287,6 +287,7 @@
 }
 
 .held-item-preview-copy strong {
+  overflow-wrap: anywhere;
   font-size: 0.92rem;
   font-weight: 600;
 }

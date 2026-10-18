@@ -59,6 +59,28 @@ The skin's artwork is preserved; arbitrary hand-sculpted clothing and hair from
 reference illustrations are not recreated automatically. Extra geometry and
 lighting can be more demanding on older graphics hardware.
 
+### Java 3D held items
+
+Select an arm, choose **Add Item** (or **Change Item**), and open **Java 3D Model**.
+Choose a self-contained Java block/item `.json` exported from Blockbench, then
+provide a PNG for each texture listed. Texture aliases, per-face UVs and quarter-turn
+UV rotations, cuboid element rotations/rescaling, and multiple textures are supported.
+The model's `thirdperson_righthand` and `thirdperson_lefthand` settings determine
+its grip, including left-hand mirroring. Manual offsets are applied on top;
+**Reset to Default** restores the authored grip. PNG-only items remain available.
+
+Models and their textures travel with saved poses, share links, and diagnostics.
+They work with both render styles and all avatar rigs. Larger models can exceed
+the existing share-link size limit; save and send the `.mcpose` file instead.
+
+This importer accepts cuboid Java models, not `.bbmodel` projects, Bedrock models,
+resource-pack item-definition wrappers, animated textures, or parent-dependent
+models. Export inherited elements and display settings into a self-contained
+model first. Limits: 2,048 elements, 4 MB source JSON, 2,048 pixels per texture edge,
+8 MB per uploaded PNG, and 18 MB total embedded texture data. Texture paths are
+labels for selecting local files, not URLs fetched from the model. Imported
+models retain their authored geometry instead of receiving avatar bevels.
+
 ## Built With
 
 - React 19

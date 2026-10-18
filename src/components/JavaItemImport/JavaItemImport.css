@@ -1,0 +1,11 @@
+.java-item-import {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  & p { margin: 0; line-height: 1.5; }
+  & .file-field { display: grid; gap: 0.5rem; overflow-wrap: anywhere; }
+  & input { width: 100%; min-width: 0; }
+  & img { width: 64px; height: 64px; object-fit: contain; image-rendering: pixelated; background: #303640; }
+  & .error { color: #ffb4a2; }
+  & .note { font-size: 0.8rem; color: var(--text-muted); }
+}

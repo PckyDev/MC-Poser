@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { SkinViewer } from "skinview3d";
+import { createJavaItemGroup, normalizeJavaItemAsset, type JavaItemAsset } from "./lib/javaItemModel";
 import { normalizeRenderAppearance, type RenderAppearance } from "./lib/renderAppearance";
 import { createStylizedMaterial, createStylizedRenderer, prepareStylizedGeometry } from "./lib/stylizedRenderer";
 import { syncStylizedAvatarGeometry } from "./lib/stylizedAvatar";
@@ -271,10 +272,11 @@ type SharedHeldItemAdjustmentsPayload = readonly [
 
 type SharedHeldItemPayload = readonly [
   string,
-  0 | 1,
+  0 | 1 | 2,
   string,
   string,
   SharedHeldItemAdjustmentsPayload?,
+  JavaItemAsset?,
 ];
 
 type SharedHeldItemsPayload = readonly [
@@ -1048,6 +1050,14 @@ function normalizeImportedHeldItem(rawHeldItem: unknown): HeldItem | null {
   if (!isObjectRecord(rawHeldItem)) {
     return null;
   }
+  if (rawHeldItem.sourceKind === "java") {
+    const javaModel = normalizeJavaItemAsset(rawHeldItem.javaModel);
+    return { javaModel, sourceKind: "java", presetId: null,
+      source: Object.values(javaModel.textures)[0]!,
+      label: typeof rawHeldItem.label === "string" ? rawHeldItem.label.slice(0,256) : "Java item",
+      detail: `${javaModel.model.elements.length} model elements`,
+      adjustments: normalizeImportedHeldItemAdjustments(rawHeldItem.adjustments) };
+  }
 
   const presetId = isHeldItemPresetId(rawHeldItem.presetId)
     ? rawHeldItem.presetId
@@ -1691,12 +1701,12 @@ function avatarTypeFromShareCode(value: unknown): AvatarType {
     : "default";
 }
 
-function heldItemSourceKindToShareCode(value: HeldItem["sourceKind"]): 0 | 1 {
-  return value === "preset" ? 0 : 1;
+function heldItemSourceKindToShareCode(value: HeldItem["sourceKind"]): 0 | 1 | 2 {
+  return value === "java" ? 2 : value === "preset" ? 0 : 1;
 }
 
 function heldItemSourceKindFromShareCode(value: unknown): HeldItem["sourceKind"] {
-  return value === 0 ? "preset" : "upload";
+  return value === 2 ? "java" : value === 0 ? "preset" : "upload";
 }
 
 function encodeShareSelection(selection: PoseSelection): SharedSelectionPayload {
@@ -1861,6 +1871,7 @@ function encodeShareHeldItem(item: HeldItem | null): SharedHeldItemPayload | nul
   }
 
   const encodedAdjustments = encodeShareHeldItemAdjustments(item.adjustments);
+  if (item.sourceKind === "java") return [item.label, 2, item.detail, "java", encodedAdjustments, item.javaModel];
 
   return encodedAdjustments
     ? [
@@ -1882,6 +1893,7 @@ function decodeShareHeldItem(payload: unknown): HeldItem | null {
   if (!Array.isArray(payload) || typeof payload[3] !== "string") {
     return null;
   }
+  if (payload[1] === 2) return normalizeImportedHeldItem({ sourceKind: "java", label: payload[0], javaModel: payload[5], adjustments: decodeShareHeldItemAdjustments(payload[4]) });
 
   const sourceKind = heldItemSourceKindFromShareCode(payload[1]);
   const payloadValue = payload[3].trim();
@@ -1941,6 +1953,9 @@ function decodeShareHeldItems(payload: unknown): HeldItemsState {
   };
 }
 
+const javaItemGeometryIds = new WeakMap<object, number>();
+let nextJavaItemGeometryId = 0;
+
 function buildHeldItemGeometryKey(heldItems: HeldItemsState): string {
   return HELD_ITEM_ARM_IDS.map((armId) => {
     const heldItem = heldItems[armId];
@@ -1949,6 +1964,15 @@ function buildHeldItemGeometryKey(heldItems: HeldItemsState): string {
       return `${armId}:none`;
     }
 
+    // Assets are immutable. Avoid serializing embedded textures on every pose edit.
+    if (heldItem.sourceKind === "java" && heldItem.javaModel) {
+      let id = javaItemGeometryIds.get(heldItem.javaModel);
+      if (id === undefined) {
+        id = ++nextJavaItemGeometryId;
+        javaItemGeometryIds.set(heldItem.javaModel, id);
+      }
+      return `${armId}:java:${id}`;
+    }
     const thickness = cloneHeldItemAdjustments(heldItem.adjustments).thickness;
 
     return [
@@ -3224,6 +3248,7 @@ export default function App() {
       }
 
       heldItemGroup.removeFromParent();
+      heldItemGroup.userData.disposeTextures?.();
       heldItemGroup.traverse((descendant) => {
         if (!(descendant instanceof Mesh)) {
           return;
@@ -3262,6 +3287,20 @@ export default function App() {
     modelType: ArmModel,
     adjustments: HeldItemAdjustments,
   ): void {
+    if (heldItemGroup.userData.javaItem) {
+      const a = cloneHeldItemAdjustments(adjustments);
+      const advanced = avatarType === "advanced" || avatarType === "stylized";
+      const sign = armId === "leftArm" ? 1 : -1;
+      heldItemGroup.position.set((advanced ? 0 : sign * (modelType === "slim" ? 0.5 : 1)) + sign*a.offsetX,
+        (advanced ? -4 : -8) + a.offsetY, 2 + a.offsetZ);
+      // Blockbench faces -Z; MC Poser faces +Z. Rotate its hand basis as a unit.
+      heldItemGroup.rotation.set(-Math.PI/2, Math.PI, 0, "YXZ");
+      heldItemGroup.rotateX(a.rotationX*Math.PI/180);
+      heldItemGroup.rotateY(a.rotationY*Math.PI/180);
+      heldItemGroup.rotateZ(a.rotationZ*Math.PI/180);
+      heldItemGroup.scale.setScalar(a.scale);
+      return;
+    }
     const direction = armId === "leftArm" ? 1 : -1;
     const horizontalOffset = modelType === "slim" ? 0.55 : 0.75;
     const baseYRotation = armId === "leftArm" ? Math.PI : 0;
@@ -3312,11 +3351,24 @@ export default function App() {
     const requestId = heldItemBuildRequestIdRef.current;
     const nextHeldItemMeshes: HeldItemMeshes = {};
     const modelType = viewer.playerObject.skin.modelType as ArmModel;
-
+    let installed = false;
+    try {
     for (const armId of HELD_ITEM_ARM_IDS) {
       const heldItem = nextHeldItems[armId];
 
       if (!heldItem) {
+        continue;
+      }
+
+      if (heldItem.sourceKind === "java" && heldItem.javaModel) {
+        const group = await createJavaItemGroup(heldItem.javaModel, armId === "leftArm");
+        nextHeldItemMeshes[armId] = group;
+        if (heldItemBuildRequestIdRef.current !== requestId) {
+          return;
+        }
+        group.name = `${armId}-held-item-group`;
+        group.visible = showHeldItems;
+        applyHeldItemTransform(group, armId, modelType, heldItem.adjustments);
         continue;
       }
 
@@ -3351,18 +3403,25 @@ export default function App() {
       heldItemGroup.add(heldItemMesh);
       heldItemGroup.visible = showHeldItems;
       applyHeldItemTransform(heldItemGroup, armId, modelType, heldItem.adjustments);
-      resolveHeldItemAttachmentParent(viewer, armId).add(heldItemGroup);
       nextHeldItemMeshes[armId] = heldItemGroup;
     }
 
     if (heldItemBuildRequestIdRef.current !== requestId) {
-      Object.values(nextHeldItemMeshes).forEach((heldItemGroup) => {
-        heldItemGroup?.removeFromParent();
-      });
       return;
     }
-
+    for (const armId of HELD_ITEM_ARM_IDS) {
+      const group = nextHeldItemMeshes[armId];
+      if (group) resolveHeldItemAttachmentParent(viewer, armId).add(group);
+    }
     heldItemMeshesRef.current = nextHeldItemMeshes;
+    installed = true;
+    } finally {
+      if (!installed) Object.values(nextHeldItemMeshes).forEach(group => {
+        group?.removeFromParent();
+        group?.userData.disposeTextures?.();
+        group?.traverse(object => { if (object instanceof Mesh) { object.geometry.dispose(); disposeOwnedMeshMaterials(object); } });
+      });
+    }
   }
 
   function getViewerOuterLayerMeshes(viewer: SkinViewer): {
@@ -4284,7 +4343,8 @@ export default function App() {
       const appliedHeldItem = {
         ...nextHeldItem,
         adjustments: cloneHeldItemAdjustments(
-          previousHeldItem?.adjustments ?? nextHeldItem.adjustments,
+          nextHeldItem.sourceKind === "java" || previousHeldItem?.sourceKind === "java"
+            ? nextHeldItem.adjustments : previousHeldItem?.adjustments ?? nextHeldItem.adjustments,
         ),
       };
 
@@ -4747,7 +4807,7 @@ export default function App() {
   }, [advancedArmCapTextureOffsets, resolvedModel, skin]);
 
   useEffect(() => {
-    if (skin?.origin !== "upload") {
+    if (skin?.origin !== "upload" || skin.modelPreference === uploadModel) {
       return;
     }
 
@@ -5841,6 +5901,7 @@ export default function App() {
   }
 
   function handleUploadModelChange(nextModel: ModelPreference): void {
+    if (nextModel === uploadModel && (skin?.origin !== "upload" || skin.modelPreference === nextModel)) return;
     updateDocument(activeDocumentId, (currentDocument) => ({
       ...currentDocument,
       uploadModel: nextModel,
@@ -6151,6 +6212,7 @@ export default function App() {
         onClose={closeHeldItemModal}
         onSelectPreset={handleHeldItemPresetSelect}
         onSelectUpload={handleHeldItemUploadSelect}
+        onSelectModel={(item) => { if (heldItemModalArmId) applyHeldItemToArm(heldItemModalArmId, item); }}
       />
 
       <ArmCapTextureModal
