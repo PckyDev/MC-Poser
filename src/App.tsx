@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { SkinViewer } from "skinview3d";
+import { createOuterLayerVoxelGeometry, getTexturePixelSource } from "./lib/skinVoxels";
+import { AdvancedEditor, type AdvancedEditorHandle } from "./components/AdvancedEditor";
+import { SceneLoading } from "./components/SceneLoading";
+import { createEditorScene, createSceneAvatar, normalizeEditorScene, type EditorMode, type EditorScene } from "./lib/scene";
 import { createJavaItemGroup, normalizeJavaItemAsset, type JavaItemAsset } from "./lib/javaItemModel";
 import { normalizeRenderAppearance, type RenderAppearance } from "./lib/renderAppearance";
 import { createStylizedMaterial, createStylizedRenderer, prepareStylizedGeometry } from "./lib/stylizedRenderer";
@@ -134,6 +138,8 @@ import {
 } from "./utils/heldItems";
 
 type WorkspaceDocument = {
+  editorMode: EditorMode;
+  scene: EditorScene | null;
   appearance: RenderAppearance;
   id: string;
   poseFileName: string;
@@ -155,6 +161,7 @@ type WorkspaceDocument = {
 type DocumentHistorySnapshot = Pick<
   WorkspaceDocument,
   | "advancedArmCapTextureOffsets"
+  | "scene"
   | "appearance"
   | "avatarType"
   | "heldItems"
@@ -180,6 +187,8 @@ type DocumentUpdateOptions = {
 };
 
 type ImportedWorkspaceFile = {
+  editorMode?: unknown;
+  scene?: unknown;
   appearance?: unknown;
   version?: unknown;
   poseFileName?: unknown;
@@ -198,6 +207,8 @@ type ImportedWorkspaceFile = {
 };
 
 type SerializableWorkspaceFile = {
+  editorMode: EditorMode;
+  scene: EditorScene | null;
   appearance: RenderAppearance;
   version: 2;
   poseFileName: string;
@@ -313,6 +324,7 @@ type SharedProjectPayload =
       SharedHeldItemsPayload,
       (0 | 1)?,
       RenderAppearance?,
+      (EditorScene | null)?,
     ];
 
 type SharedExportSettingsPayload = readonly [
@@ -370,18 +382,7 @@ type RotationGizmoBinding = {
   updatePoseFromObject: (nextPose: PoseState, object: Object3D) => PoseState;
 };
 
-type TexturePixelSource = {
-  data: Uint8ClampedArray;
-  width: number;
-  height: number;
-};
 
-type TexturePixelSample = {
-  red: number;
-  green: number;
-  blue: number;
-  alpha: number;
-};
 
 type MeshMaterial = Mesh["material"];
 
@@ -477,24 +478,6 @@ const POSE_BONE_ID_SET = new Set<PoseBoneId>(POSE_BONES.map((bone) => bone.id));
 const POSE_PRESET_NAME_SET = new Set<PosePresetName>(
   Object.keys(POSE_PRESETS) as PosePresetName[],
 );
-const OUTER_LAYER_TEXTURE_ORIGINS: Record<PoseBoneId, { u: number; v: number }> = {
-  head: { u: 32, v: 0 },
-  torso: { u: 16, v: 32 },
-  leftArm: { u: 48, v: 48 },
-  rightArm: { u: 40, v: 32 },
-  leftLeg: { u: 0, v: 48 },
-  rightLeg: { u: 0, v: 32 },
-};
-const VOXEL_TEMPLATE_GEOMETRY = new BoxGeometry(1, 1, 1).toNonIndexed();
-const VOXEL_TEMPLATE_POSITIONS = Array.from(
-  VOXEL_TEMPLATE_GEOMETRY.getAttribute("position").array as Float32Array,
-);
-const VOXEL_TEMPLATE_NORMALS = Array.from(
-  VOXEL_TEMPLATE_GEOMETRY.getAttribute("normal").array as Float32Array,
-);
-const VOXEL_CUBE_SCALE = 1;
-const VOXEL_EXTRUSION_THICKNESS = 0.5;
-const VOXEL_FACE_SHADING = [0.82, 0.82, 1.08, 0.68, 1, 0.9];
 const VIEWPORT_MATERIAL_VARIANTS_KEY = "__mcPoserViewportMaterialVariants";
 const VIEWPORT_GIZMO_FACE_DEFINITIONS: ViewportGizmoFaceDefinition[] = [
   {
@@ -634,14 +617,7 @@ const VIEWPORT_LIGHTING_PRESETS: Record<
 
 type VoxelThicknessAxis = "x" | "y" | "z";
 
-type VoxelSlabTransform = {
-  axis: VoxelThicknessAxis;
-  outwardDirection: -1 | 1;
-};
 
-function getOuterLayerShellExpansion(boneId: PoseBoneId): number {
-  return boneId === "head" ? 0.5 : 0.25;
-}
 
 function resolveViewportGizmoCameraView(viewId: ViewportGizmoViewId): {
   direction: Vector3;
@@ -1288,55 +1264,7 @@ function getSaveFilePicker(): SaveFilePickerWindow["showSaveFilePicker"] {
   return (window as SaveFilePickerWindow).showSaveFilePicker;
 }
 
-function getOuterLayerDimensions(
-  boneId: PoseBoneId,
-  modelType: ArmModel,
-): { width: number; height: number; depth: number } {
-  switch (boneId) {
-    case "head":
-      return { width: 8, height: 8, depth: 8 };
-    case "torso":
-      return { width: 8, height: 12, depth: 4 };
-    case "leftArm":
-    case "rightArm":
-      return { width: modelType === "slim" ? 3 : 4, height: 12, depth: 4 };
-    case "leftLeg":
-    case "rightLeg":
-      return { width: 4, height: 12, depth: 4 };
-  }
-}
 
-function getTexturePixelSource(texture: Texture | null): TexturePixelSource | null {
-  const image = texture?.image as (CanvasImageSource & {
-    width?: number;
-    height?: number;
-  }) | null;
-
-  if (!image || typeof image.width !== "number" || typeof image.height !== "number") {
-    return null;
-  }
-
-  const canvas = document.createElement("canvas");
-  canvas.width = image.width;
-  canvas.height = image.height;
-
-  const context = canvas.getContext("2d");
-
-  if (!context) {
-    return null;
-  }
-
-  context.clearRect(0, 0, canvas.width, canvas.height);
-  context.drawImage(image, 0, 0, canvas.width, canvas.height);
-
-  const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-
-  return {
-    data: imageData.data,
-    width: canvas.width,
-    height: canvas.height,
-  };
-}
 
 function getTexturePreviewDataUrl(texture: Texture | null): string | null {
   const image = texture?.image as (CanvasImageSource & {
@@ -1367,193 +1295,7 @@ function getTexturePreviewDataUrl(texture: Texture | null): string | null {
   }
 }
 
-function sampleTexturePixel(
-  pixelSource: TexturePixelSource,
-  x: number,
-  y: number,
-): TexturePixelSample {
-  // Face regions use the normalized 64x64 atlas, including converted legacy skins.
-  // Sample the center of that texel when the source is a higher-resolution skin.
-  x = Math.floor((x + 0.5) * pixelSource.width / 64);
-  y = Math.floor((y + 0.5) * pixelSource.height / 64);
-  if (x < 0 || x >= pixelSource.width || y < 0 || y >= pixelSource.height) {
-    return {
-      red: 0,
-      green: 0,
-      blue: 0,
-      alpha: 0,
-    };
-  }
 
-  const pixelIndex = (y * pixelSource.width + x) * 4;
-
-  return {
-    red: pixelSource.data[pixelIndex] ?? 0,
-    green: pixelSource.data[pixelIndex + 1] ?? 0,
-    blue: pixelSource.data[pixelIndex + 2] ?? 0,
-    alpha: pixelSource.data[pixelIndex + 3] ?? 0,
-  };
-}
-
-function createOuterLayerVoxelGeometry(
-  boneId: PoseBoneId,
-  modelType: ArmModel,
-  pixelSource: TexturePixelSource,
-): BufferGeometry | null {
-  const { width, height, depth } = getOuterLayerDimensions(boneId, modelType);
-  const textureOrigin = OUTER_LAYER_TEXTURE_ORIGINS[boneId];
-  const surfaceOffset = getOuterLayerShellExpansion(boneId);
-  const positions: number[] = [];
-  const normals: number[] = [];
-  const colors: number[] = [];
-
-  const appendVoxel = (
-    center: { x: number; y: number; z: number },
-    slabTransform: VoxelSlabTransform,
-    pixel: TexturePixelSample,
-  ) => {
-    const inwardShift = (VOXEL_CUBE_SCALE - VOXEL_EXTRUSION_THICKNESS) / 2;
-
-    for (let positionIndex = 0; positionIndex < VOXEL_TEMPLATE_POSITIONS.length; positionIndex += 3) {
-      const baseX = VOXEL_TEMPLATE_POSITIONS[positionIndex] ?? 0;
-      const baseY = VOXEL_TEMPLATE_POSITIONS[positionIndex + 1] ?? 0;
-      const baseZ = VOXEL_TEMPLATE_POSITIONS[positionIndex + 2] ?? 0;
-      let localX = baseX * VOXEL_CUBE_SCALE;
-      let localY = baseY * VOXEL_CUBE_SCALE;
-      let localZ = baseZ * VOXEL_CUBE_SCALE;
-
-      if (slabTransform.axis === "x") {
-        localX =
-          baseX * VOXEL_EXTRUSION_THICKNESS - slabTransform.outwardDirection * inwardShift;
-      } else if (slabTransform.axis === "y") {
-        localY =
-          baseY * VOXEL_EXTRUSION_THICKNESS - slabTransform.outwardDirection * inwardShift;
-      } else {
-        localZ =
-          baseZ * VOXEL_EXTRUSION_THICKNESS - slabTransform.outwardDirection * inwardShift;
-      }
-
-      positions.push(
-        localX + center.x,
-        localY + center.y,
-        localZ + center.z,
-      );
-      normals.push(
-        VOXEL_TEMPLATE_NORMALS[positionIndex] ?? 0,
-        VOXEL_TEMPLATE_NORMALS[positionIndex + 1] ?? 0,
-        VOXEL_TEMPLATE_NORMALS[positionIndex + 2] ?? 0,
-      );
-    }
-
-    const alpha = pixel.alpha / 255;
-
-    for (let faceIndex = 0; faceIndex < VOXEL_FACE_SHADING.length; faceIndex += 1) {
-      const shading = VOXEL_FACE_SHADING[faceIndex] ?? 1;
-      const red = Math.min(1, (pixel.red / 255) * shading);
-      const green = Math.min(1, (pixel.green / 255) * shading);
-      const blue = Math.min(1, (pixel.blue / 255) * shading);
-
-      for (let vertexIndex = 0; vertexIndex < 6; vertexIndex += 1) {
-        colors.push(red, green, blue, alpha);
-      }
-    }
-  };
-
-  const visitFaceTexels = (
-    region: { u: number; v: number; width: number; height: number },
-    slabTransform: VoxelSlabTransform,
-    createCenter: (pixelX: number, pixelY: number) => { x: number; y: number; z: number },
-  ) => {
-    for (let pixelY = 0; pixelY < region.height; pixelY += 1) {
-      for (let pixelX = 0; pixelX < region.width; pixelX += 1) {
-        const textureX = region.u + pixelX;
-        const textureY = region.v + pixelY;
-        const pixel = sampleTexturePixel(pixelSource, textureX, textureY);
-
-        if (pixel.alpha === 0) {
-          continue;
-        }
-
-        appendVoxel(createCenter(pixelX, pixelY), slabTransform, pixel);
-      }
-    }
-  };
-
-  visitFaceTexels(
-    { u: textureOrigin.u + depth, v: textureOrigin.v + depth, width, height },
-    { axis: "z", outwardDirection: 1 },
-    (pixelX, pixelY) => ({
-      x: -width / 2 + 0.5 + pixelX,
-      y: height / 2 - 0.5 - pixelY,
-      z: depth / 2 + surfaceOffset,
-    }),
-  );
-
-  visitFaceTexels(
-    { u: textureOrigin.u + width + depth * 2, v: textureOrigin.v + depth, width, height },
-    { axis: "z", outwardDirection: -1 },
-    (pixelX, pixelY) => ({
-      x: width / 2 - 0.5 - pixelX,
-      y: height / 2 - 0.5 - pixelY,
-      z: -depth / 2 - surfaceOffset,
-    }),
-  );
-
-  visitFaceTexels(
-    { u: textureOrigin.u, v: textureOrigin.v + depth, width: depth, height },
-    { axis: "x", outwardDirection: -1 },
-    (pixelX, pixelY) => ({
-      x: -width / 2 - surfaceOffset,
-      y: height / 2 - 0.5 - pixelY,
-      z: -depth / 2 + 0.5 + pixelX,
-    }),
-  );
-
-  visitFaceTexels(
-    { u: textureOrigin.u + width + depth, v: textureOrigin.v + depth, width: depth, height },
-    { axis: "x", outwardDirection: 1 },
-    (pixelX, pixelY) => ({
-      x: width / 2 + surfaceOffset,
-      y: height / 2 - 0.5 - pixelY,
-      z: depth / 2 - 0.5 - pixelX,
-    }),
-  );
-
-  visitFaceTexels(
-    { u: textureOrigin.u + depth, v: textureOrigin.v, width, height: depth },
-    { axis: "y", outwardDirection: 1 },
-    (pixelX, pixelY) => ({
-      x: -width / 2 + 0.5 + pixelX,
-      y: height / 2 + surfaceOffset,
-      z: -depth / 2 + 0.5 + pixelY,
-    }),
-  );
-
-  // Match skinview3d's bottom UVs for every arm model and skin format.
-  // Arm width does not change head/hat orientation; rows run back to front.
-  visitFaceTexels(
-    { u: textureOrigin.u + width + depth, v: textureOrigin.v, width, height: depth },
-    { axis: "y", outwardDirection: -1 },
-    (pixelX, pixelY) => ({
-      x: -width / 2 + 0.5 + pixelX,
-      y: -height / 2 - surfaceOffset,
-      z: -depth / 2 + 0.5 + pixelY,
-    }),
-  );
-
-  if (positions.length === 0) {
-    return null;
-  }
-
-  const voxelGeometry = new BufferGeometry();
-  voxelGeometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
-  voxelGeometry.setAttribute("normal", new Float32BufferAttribute(normals, 3));
-  voxelGeometry.setAttribute("color", new Float32BufferAttribute(colors, 4));
-  voxelGeometry.computeBoundingBox();
-  voxelGeometry.computeBoundingSphere();
-
-  return voxelGeometry;
-}
 
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -2003,6 +1745,7 @@ function encodeWorkspaceForShare(
     encodeShareHeldItems(workspaceFile.heldItems),
     workspaceFile.showHeldItems ? 1 : 0,
     workspaceFile.appearance,
+    workspaceFile.scene,
   ];
 }
 
@@ -2049,6 +1792,8 @@ function decodeSharedProjectPayload(payload: unknown): ImportedWorkspaceFile {
     showOuterLayerIn3d: sharePayload[6] === 1,
     showHeldItems: sharePayload[12] !== 0,
     appearance: normalizeRenderAppearance(sharePayload[13]),
+    editorMode: sharePayload[14] ? "advanced" : "simple",
+    scene: sharePayload[14],
     resolvedModel,
     uploadModel: modelPreferenceFromShareCode(sharePayload[9]),
     avatarType: avatarTypeFromShareCode(sharePayload[10]),
@@ -2380,6 +2125,8 @@ function createWorkspaceDocument(
   overrides: Partial<Omit<WorkspaceDocument, "id" | "poseFileName">> = {},
 ): WorkspaceDocument {
   return {
+    editorMode: overrides.editorMode ?? "simple",
+    scene: overrides.scene ?? null,
     appearance: normalizeRenderAppearance(overrides.appearance),
     id: globalThis.crypto?.randomUUID?.() ?? `doc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     poseFileName: normalizePoseFileName(rawName),
@@ -2408,6 +2155,7 @@ export default function App() {
   });
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const advancedEditorRef = useRef<AdvancedEditorHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const startupSkinInputRef = useRef<HTMLInputElement | null>(null);
   const poseFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -2450,6 +2198,7 @@ export default function App() {
   const [startupFileName, setStartupFileName] = useState("untitled-pose-01.mcpose");
   const [startupUsername, setStartupUsername] = useState(DEFAULT_USERNAME);
   const [startupAvatarType, setStartupAvatarType] = useState<AvatarType>("default");
+  const [startupEditorMode, setStartupEditorMode] = useState<EditorMode>("simple");
   const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -2487,6 +2236,17 @@ export default function App() {
   const viewportLightingModeRef = useRef<ViewportLightingMode>("unlit");
 
   const activeDocument = documents.find((document) => document.id === activeDocumentId) ?? documents[0]!;
+  const isAdvancedEditor = activeDocument.editorMode === "advanced";
+  useEffect(() => {
+    if (viewerRef.current) viewerRef.current.renderPaused = isAdvancedEditor;
+    if (isAdvancedEditor && !activeDocument.scene && activeDocument.skin) {
+      updateDocument(activeDocumentId, document => ({...document, scene: createEditorScene(createSceneAvatar(document.skin!, {
+        avatarType: document.avatarType, pose: document.pose, heldItems: document.heldItems,
+        advancedArmCapTextureOffsets: document.advancedArmCapTextureOffsets,
+        showOuterLayer: document.showOuterLayer, showOuterLayerIn3d: document.showOuterLayerIn3d, showHeldItems: document.showHeldItems,
+      }), document.appearance)}), {skipHistory:true});
+    }
+  }, [activeDocumentId, isAdvancedEditor, activeDocument.scene, activeDocument.skin]);
   const appearance = activeDocument.appearance;
   appearanceRef.current = appearance;
   const {
@@ -2590,7 +2350,7 @@ export default function App() {
       return;
     }
 
-    if (!viewerReady || !skin) {
+    if (isAdvancedEditor ? !activeDocument.scene : !viewerReady || !skin) {
       setExportPreviewUrl(null);
       setExportPreviewError("Load a skin before opening the export modal.");
       setIsExportPreviewLoading(false);
@@ -2633,7 +2393,7 @@ export default function App() {
     return () => {
       isCancelled = true;
     };
-  }, [appearance, avatarType, exportSettings, isExportModalOpen, skin, viewerReady]);
+  }, [appearance, avatarType, exportSettings, isExportModalOpen, skin, viewerReady, isAdvancedEditor, activeDocument.scene]);
 
   function releaseDocumentUploadSkin(document: WorkspaceDocument): void {
     const currentSkin = document.skin;
@@ -2657,6 +2417,7 @@ export default function App() {
     document: WorkspaceDocument,
   ): DocumentHistorySnapshot {
     return {
+      scene: document.scene,
       appearance: document.appearance,
       advancedArmCapTextureOffsets: document.advancedArmCapTextureOffsets,
       avatarType: document.avatarType,
@@ -2676,6 +2437,7 @@ export default function App() {
     second: DocumentHistorySnapshot,
   ): boolean {
     return (
+      first.scene === second.scene &&
       first.advancedArmCapTextureOffsets === second.advancedArmCapTextureOffsets &&
       first.appearance === second.appearance &&
       first.avatarType === second.avatarType &&
@@ -3568,6 +3330,10 @@ export default function App() {
     overridePoseFileName = documentToSerialize.poseFileName,
   ): Promise<SerializableWorkspaceFile> {
     return {
+      editorMode: documentToSerialize.editorMode,
+      scene: documentToSerialize.scene ? {...documentToSerialize.scene, avatars: await Promise.all(documentToSerialize.scene.avatars.map(async avatar => ({...avatar,
+        skin: (await serializeWorkspaceSkin(avatar.skin))!, heldItems: await serializeWorkspaceHeldItems(avatar.heldItems),
+      })))} : null,
       appearance: normalizeRenderAppearance(documentToSerialize.appearance),
       version: 2,
       poseFileName: overridePoseFileName,
@@ -3608,7 +3374,7 @@ export default function App() {
     setIsDownloadingDiagnostics(true);
     try {
       const warnings: string[] = [];
-      const report = collectDiagnostics(viewerRef.current, warnings);
+      const report = collectDiagnostics(isAdvancedEditor ? advancedEditorRef.current?.getViewer() ?? viewerRef.current : viewerRef.current, warnings);
       const snapshot = activeDocument;
       const editor = {
         status: diagnosticText(status), error: error ? diagnosticText(error) : null,
@@ -3617,7 +3383,7 @@ export default function App() {
         undoCount: activeDocumentHistory?.past.length ?? 0,
         redoCount: activeDocumentHistory?.future.length ?? 0,
       };
-      const workspace = await buildWorkspaceFilePayload({ ...snapshot, skin: null,
+      const workspace = await buildWorkspaceFilePayload({ ...snapshot, skin: null, scene: null,
         heldItems: { leftArm: null, rightArm: null } });
       const [skin, leftArm, rightArm] = await Promise.all([
         embedDiagnosticAsset(snapshot.skin, "Skin", warnings),
@@ -3626,6 +3392,14 @@ export default function App() {
       ]);
       workspace.skin = skin;
       workspace.heldItems = { leftArm, rightArm };
+      if (snapshot.scene) workspace.scene = { ...snapshot.scene, avatars: await Promise.all(snapshot.scene.avatars.map(async avatar => {
+        const [skin, leftArm, rightArm] = await Promise.all([
+          embedDiagnosticAsset(avatar.skin, `${avatar.name} skin`, warnings),
+          embedDiagnosticAsset(avatar.heldItems.leftArm, `${avatar.name} left item`, warnings),
+          embedDiagnosticAsset(avatar.heldItems.rightArm, `${avatar.name} right item`, warnings),
+        ]);
+        return {...avatar, skin: skin!, heldItems: {leftArm, rightArm}};
+      })) };
       downloadWorkspaceFile(`mc-poser-diagnostics-${report.createdAt.replace(/[:.]/g, "-")}.json`,
         JSON.stringify({ ...report, editor, workspace }, null, 2));
       setStatus(warnings.length ? "Diagnostics downloaded with collection warnings. Review before sharing."
@@ -4232,6 +4006,7 @@ export default function App() {
     setStartupFileName(buildSuggestedPoseName(nextPoseIndexRef.current));
     setStartupUsername(username || DEFAULT_USERNAME);
     setStartupAvatarType("default");
+    setStartupEditorMode("simple");
     setIsNewFileModalOpen(true);
   }
 
@@ -4331,7 +4106,7 @@ export default function App() {
   }
 
   function openExportModal(): void {
-    setExportSettings(buildDefaultExportSettings(viewerRef.current?.canvas ?? null));
+    setExportSettings({...buildDefaultExportSettings(viewerRef.current?.canvas ?? null), ...(isAdvancedEditor ? activeDocument.scene?.frame : {})});
     setExportPreviewError(null);
     setExportPreviewUrl(null);
     setIsExportModalOpen(true);
@@ -5280,6 +5055,7 @@ export default function App() {
     const { file, detail } = pendingNewFileUpload;
     const objectUrl = URL.createObjectURL(file);
     const nextDocument = openDocumentFromStartup(startupFileName, {
+      editorMode: startupEditorMode,
       skin: {
         source: objectUrl,
         label: file.name.replace(/\.png$/i, ""),
@@ -5320,6 +5096,13 @@ export default function App() {
         ? parsedFile.poseFileName
         : fallbackFileName,
       {
+        editorMode: parsedFile.editorMode === "advanced" || parsedFile.scene ? "advanced" : "simple",
+        scene: parsedFile.scene ? normalizeEditorScene(parsedFile.scene, raw => {
+          const skin = normalizeImportedSkin(raw.skin, null);
+          if (!skin) throw new Error("Every scene avatar needs a valid skin.");
+          return {skin, pose: normalizeImportedPose(raw.pose), heldItems: normalizeImportedHeldItems(raw.heldItems),
+            advancedArmCapTextureOffsets: normalizeImportedAdvancedArmCapTextureOffsets(raw.advancedArmCapTextureOffsets)};
+        }) : null,
         advancedArmCapTextureOffsets: normalizeImportedAdvancedArmCapTextureOffsets(
           parsedFile.advancedArmCapTextureOffsets,
         ),
@@ -5466,8 +5249,7 @@ export default function App() {
           shareLandingMode !== "image" ||
           !sharedImageSettings ||
           !viewerReady ||
-          !skin ||
-          isLoading
+          (isAdvancedEditor ? !activeDocument.scene : !skin || isLoading)
         ) {
           return;
         }
@@ -5508,7 +5290,7 @@ export default function App() {
         return () => {
           isCancelled = true;
         };
-      }, [appearance, avatarType, isLoading, shareLandingMode, sharedImageSettings, skin, viewerReady]);
+      }, [appearance, avatarType, isLoading, shareLandingMode, sharedImageSettings, skin, viewerReady, isAdvancedEditor, activeDocument.scene]);
   function handleSelectBone(nextBoneId: PoseBoneId): void {
     updateDocument(activeDocumentId, (currentDocument) => ({
       ...currentDocument,
@@ -5541,6 +5323,7 @@ export default function App() {
   }
 
   function applyPreset(nextPreset: PosePresetName): void {
+    if (isAdvancedEditor) { advancedEditorRef.current?.preset(nextPreset); return; }
     updateDocument(activeDocumentId, (currentDocument) => ({
       ...currentDocument,
       selectedPreset: nextPreset,
@@ -5549,11 +5332,13 @@ export default function App() {
   }
 
   function resetPose(): void {
+    if (isAdvancedEditor) { advancedEditorRef.current?.preset(null); return; }
     applyPreset("neutral");
     setStatus("Pose reset to neutral.");
   }
 
   function handleResetCamera(): void {
+    if (isAdvancedEditor) { advancedEditorRef.current?.resetCamera(); return; }
     const viewer = viewerRef.current;
 
     if (!viewer) {
@@ -5567,6 +5352,10 @@ export default function App() {
   }
 
   async function renderExportBlob(settings: ExportSettings): Promise<Blob> {
+    if (isAdvancedEditor) {
+      if (!advancedEditorRef.current) throw new Error("The scene is still loading.");
+      return advancedEditorRef.current.export(settings);
+    }
     const viewer = viewerRef.current;
     const stage = stageRef.current;
     const selectedOutline = selectedOutlineRef.current;
@@ -5687,18 +5476,19 @@ export default function App() {
   }
 
   async function handleExport(): Promise<void> {
-    if (!skin) {
+    if (isAdvancedEditor ? !activeDocument.scene : !skin) {
       return;
     }
+    const label=isAdvancedEditor ? poseFileName.replace(/\.mcpose$/i,"") : skin!.label;
 
     try {
       setIsExporting(true);
       const exportBlob = await renderExportBlob(exportSettings);
-      const exportFileName = `${buildDownloadName(skin.label)}.${exportSettings.fileType}`;
+      const exportFileName = `${buildDownloadName(label)}.${exportSettings.fileType}`;
 
       downloadExportFile(exportFileName, exportBlob);
       closeExportModal();
-      setStatus(`Exported ${skin.label} as ${exportSettings.fileType.toUpperCase()}.`);
+      setStatus(`Exported ${label} as ${exportSettings.fileType.toUpperCase()}.`);
       setError(null);
     } catch (exportError) {
       setError(
@@ -5771,7 +5561,7 @@ export default function App() {
   }
 
   async function handleGenerateImageShareLink(): Promise<void> {
-    if (!skin) {
+    if (isAdvancedEditor ? !activeDocument.scene : !skin) {
       return;
     }
 
@@ -5786,7 +5576,7 @@ export default function App() {
       const compressedPayload = await compressTextPayload(serializedImageShare);
 
       setImageShareLink(buildShareUrl("image", compressedPayload));
-      setStatus(`Image share link ready for ${skin.label}.`);
+      setStatus(`Image share link ready for ${poseFileName}.`);
     } catch (shareError) {
       setImageShareError(
         shareError instanceof Error
@@ -5960,6 +5750,7 @@ export default function App() {
     }
 
     const nextDocument = openDocumentFromStartup(startupFileName, {
+      editorMode: startupEditorMode,
       avatarType: startupAvatarType,
     });
 
@@ -5977,8 +5768,8 @@ export default function App() {
   }
 
   const adjustedJointCount = countAdjustedJoints(pose);
-  const isExportDisabled = !skin || isLoading || shareLandingMode === "image";
-  const isShareDisabled = !skin || isLoading || shareLandingMode === "image";
+  const isExportDisabled = (isAdvancedEditor ? !activeDocument.scene : !skin || isLoading) || shareLandingMode === "image";
+  const isShareDisabled = isExportDisabled;
   const currentModelLabel = skin ? formatModelLabel(skin.modelPreference, resolvedModel) : "No model";
   const activePoseLabel = selectedPreset ? formatPresetName(selectedPreset) : "Custom";
   const shareImageOutputSummary = `${exportSettings.fileType.toUpperCase()} • ${exportSettings.width} x ${exportSettings.height} • ${
@@ -6036,7 +5827,12 @@ export default function App() {
         onSelectDocument={switchToDocument}
       />
 
-      <main className="editor-body">
+      {isAdvancedEditor && activeDocument.scene ? <AdvancedEditor key={activeDocumentId} ref={advancedEditorRef} scene={activeDocument.scene}
+        onChange={(scene,historyGroup,skipHistory)=>updateDocument(activeDocumentId, document=>({...document,scene}),{historyGroup,skipHistory})}
+        resolveSkin={resolveSkinLookup} onError={setError} documentOpen={isDocumentModalOpen} onCloseDocument={closeDocumentModal}
+        poseFileName={poseFileName} onRename={handlePoseFileNameChange}/> : null}
+      {isAdvancedEditor && !activeDocument.scene ? <SceneLoading loading={isLoading} error={error} onChooseSkin={()=>setIsDocumentModalOpen(true)}/> : null}
+      <main className="editor-body" style={isAdvancedEditor ? {display:"none"} : undefined}>
         <LeftSidebar
           avatarType={avatarType}
           selectedSelection={selectedPoseSelection}
@@ -6123,7 +5919,7 @@ export default function App() {
       />
 
       <DocumentModal
-        isOpen={isDocumentModalOpen}
+        isOpen={isDocumentModalOpen && (!isAdvancedEditor || !activeDocument.scene)}
         poseFileName={poseFileName}
         skinLabel={skin?.label ?? null}
         skinOrigin={skin?.origin ?? "none"}
@@ -6148,6 +5944,7 @@ export default function App() {
       />
 
       <ExportModal
+        sceneMode={isAdvancedEditor}
         isOpen={isExportModalOpen}
         isExporting={isExporting}
         isPreviewLoading={isExportPreviewLoading}
@@ -6252,6 +6049,8 @@ export default function App() {
         startupFileName={startupFileName}
         startupUsername={startupUsername}
         startupAvatarType={startupAvatarType}
+        editorMode={startupEditorMode}
+        onEditorModeChange={setStartupEditorMode}
         isLoading={isLoading}
         uploadedSkinPreviewUrl={pendingNewFileUpload?.previewUrl ?? null}
         uploadedSkinName={pendingNewFileUpload?.fileName ?? null}

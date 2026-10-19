@@ -1,4 +1,5 @@
-import type { SkinViewer } from "skinview3d";
+import type { SkinViewer as FullSkinViewer } from "skinview3d";
+type SkinViewer = Pick<FullSkinViewer, "playerObject">;
 import {
   BoxGeometry,
   BufferAttribute,

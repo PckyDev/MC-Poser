@@ -1,5 +1,5 @@
 import {
-  Color, DepthTexture, DirectionalLight, Group, MeshStandardMaterial,
+  Color, DepthTexture, DirectionalLight, Group, MeshStandardMaterial, Vector3, type Box3,
   PCFShadowMap, Vector2, Matrix4, Float32BufferAttribute, type BufferGeometry, type Material, type Texture, type WebGLRenderer, type WebGLRenderTarget,
 } from "three";
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
@@ -285,8 +285,22 @@ export function createStylizedRenderer(viewer: SkinViewer) {
   const originalShadowEnabled = viewer.renderer.shadowMap.enabled;
   const originalShadowType = viewer.renderer.shadowMap.type;
   let active = false;
+  let sceneCenter: Vector3 | null = null;
 
   return {
+    // Simple poses retain their original studio. Multi-avatar scenes expand the
+    // shadow cameras and light spacing together, keeping every avatar covered.
+    setSceneBounds(bounds: Box3) {
+      if (bounds.isEmpty()) return;
+      sceneCenter = bounds.getCenter(new Vector3());
+      const scale = Math.max(1, bounds.getSize(new Vector3()).length() / 56);
+      rig.scale.setScalar(scale);
+      for (const light of [key, ...softKeys, rim, rimLeft]) {
+        Object.assign(light.shadow.camera, { left: -36 * scale, right: 36 * scale,
+          top: 40 * scale, bottom: -40 * scale, near: scale, far: 140 * scale });
+        light.shadow.camera.updateProjectionMatrix();
+      }
+    },
     setAppearance(appearance: RenderAppearance) {
       active = appearance.mode === "stylized";
       rig.visible = active;
@@ -303,7 +317,7 @@ export function createStylizedRenderer(viewer: SkinViewer) {
     },
     beforeRender() {
       if (!active) return;
-      rig.position.copy(viewer.controls.target);
+      rig.position.copy(sceneCenter ?? viewer.controls.target);
       rig.quaternion.copy(viewer.camera.quaternion);
       rig.updateMatrixWorld(true);
       finish.uniforms.inverseProjection!.value.copy(viewer.camera.projectionMatrixInverse);

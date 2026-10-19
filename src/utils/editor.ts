@@ -1,4 +1,5 @@
-import type { SkinViewer } from "skinview3d";
+import type { SkinViewer as FullSkinViewer } from "skinview3d";
+type SkinViewer = Pick<FullSkinViewer, "playerObject">;
 import { Group, type Object3D } from "three";
 
 import type { ArmModel, AvatarType, ModelPreference, PoseState } from "../types/editor";

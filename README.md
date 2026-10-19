@@ -13,6 +13,7 @@ are not currently supported.
 
 - Load skins from Mojang username lookups or local PNG files.
 - Pose characters with sliders, presets, and in-viewport rotation gizmos.
+- Choose Simple for one avatar or Advanced for a multi-avatar scene with a background image.
 - Switch between default, bobblehead, advanced, and stylized avatar rigs.
 - Bend the lower torso, spine, elbows, and knees with per-joint controls.
 - Support classic, slim, and auto-detect arm models.
@@ -25,9 +26,35 @@ are not currently supported.
 ## Workflow
 
 1. Load a skin from a Minecraft username or a PNG file.
-2. Choose an avatar type and arm model.
+2. Choose Simple or Advanced editor, an avatar type, and an arm model.
 3. Pose the character in the viewport or inspector.
 4. Export a render or share the scene with a link.
+
+### Advanced scene editor
+
+Choose **Advanced editor** below the skin source when creating a file. Simple
+keeps the original single-avatar workflow. The editor choice is separate from
+the Advanced avatar rig, and existing files continue to open in Simple.
+
+Add up to 12 avatars from usernames or PNGs. Select an avatar in the hierarchy
+to rename, duplicate, hide, remove, or pose it independently. **Move avatar** and
+**Rotate avatar** manipulate the whole character; **Pose avatar** manipulates
+its selected body part. The inspector also provides position in Minecraft blocks,
+rotation, scale, individual skin/rig settings, layers, and held items.
+
+Under **Camera / Background**, import a PNG, JPEG, or WebP screenshot. Adjust the
+camera position, look-at point, vertical field of view, and roll to match its
+perspective. Use the perspective grid as a guide, then lock the camera while
+placing characters. This is manual perspective matching: a flat screenshot does
+not automatically hide avatars behind objects or provide 3D world geometry.
+
+The background sets the composition's aspect ratio. Exports preserve the whole
+composition, omit editor guides, and include the visible backdrop. Hide the
+background for a transparent character-only PNG. Save/open, undo/redo, share
+links, and diagnostics include the scene. Large images or multiple detailed
+avatars can exceed the share-link limit; send the `.mcpose` file instead.
+Background uploads are limited to 18 MB and 8,192 pixels per edge, with a
+composition size up to 4,096 pixels per edge.
 
 ### Stylized rendering
 

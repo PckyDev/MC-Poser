@@ -1,0 +1,16 @@
+.scene-loading {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  & p {
+    max-width: 36rem;
+    color: var(--text-muted, #aeb9c8);
+  }
+  & [role="alert"] {
+    color: #ffb8a7;
+  }
+}

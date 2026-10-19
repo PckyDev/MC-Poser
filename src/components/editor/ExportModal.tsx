@@ -17,6 +17,7 @@ const EXPORT_DIMENSION_MAX = 4096;
 const EXPORT_DIMENSION_SLIDER_STEP = 16;
 
 type ExportModalProps = {
+  sceneMode?: boolean;
   isOpen: boolean;
   isExporting: boolean;
   isPreviewLoading: boolean;
@@ -32,6 +33,7 @@ type ExportModalProps = {
 };
 
 export function ExportModal({
+  sceneMode=false,
   isOpen,
   isExporting,
   isPreviewLoading,
@@ -87,7 +89,7 @@ export function ExportModal({
             <div className="modal-section-header">
               <h3>Preview</h3>
               <p className="modal-section-copy">
-                The current viewing angle is preserved while the character is refit for the selected output size.
+                {sceneMode ? "The whole scene keeps its saved framing. Editor guides are hidden; a visible background image is included." : "The current viewing angle is preserved while the character is refit for the selected output size."}
               </p>
             </div>
 

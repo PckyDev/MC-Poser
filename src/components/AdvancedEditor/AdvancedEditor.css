@@ -1,0 +1,159 @@
+.advanced-editor {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) 320px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  & .viewport {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    background: #171b21;
+  }
+  & .scene-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    padding: 0.4rem;
+    background: #22272e;
+    border-bottom: 1px solid #3c4550;
+  }
+  & .scene-toolbar button {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+  }
+  & .scene-toolbar button[aria-pressed="true"] {
+    background: #ffad5726;
+    color: #ffad57;
+  }
+  & .scene-toolbar span {
+    font-size: 0.65rem;
+    color: #b0bac8;
+    align-self: center;
+    margin-left: auto;
+  }
+  & .composition-space {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+  & .composition-frame {
+    position: relative;
+    background: #292f38;
+    flex: none;
+    box-shadow: 0 0 0 1px #505a67;
+  }
+  & .composition-frame img,
+  & .composition-frame canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  & .composition-frame img {
+    pointer-events: none;
+    object-fit: fill;
+  }
+  & .loading {
+    position: absolute;
+    bottom: 1rem;
+    left: 1rem;
+    background: #20242be6;
+    padding: 0.6rem;
+    pointer-events: none;
+  }
+  & .scene-status {
+    font-size: 0.7rem;
+    color: #aeb9c8;
+    padding: 0.5rem;
+  }
+  & .error-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: #602e29;
+    color: #ffdfd9;
+    font-size: 0.8rem;
+  }
+  & .inspector {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    border-left: 1px solid #3c4550;
+    background: #242a31;
+  }
+  & .inspector-tabs {
+    display: flex;
+    padding: 0.4rem;
+    gap: 0.3rem;
+  }
+  & .inspector-tabs button {
+    font-size: 0.75rem;
+    flex: 1;
+  }
+  & [aria-selected="true"] {
+    color: #ffad57;
+  }
+  & .settings-scroll {
+    overflow: auto;
+    max-height: 42%;
+    flex-shrink: 0;
+    border-bottom: 1px solid #3c4550;
+  }
+  & .settings-scroll.full {
+    max-height: none;
+    flex: 1;
+  }
+  & .inspector .editor-sidebar {
+    flex: 1;
+    min-height: 0;
+    width: auto;
+    border: 0;
+  }
+  & .add-dialog {
+    width: min(480px, 90vw);
+    display: grid;
+    gap: 1rem;
+    padding: 1.5rem;
+    background: #242a31;
+    border: 1px solid #475362;
+  }
+  & .dialog-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  & .dialog-heading h2 {
+    margin: 0;
+  }
+  & .add-dialog label {
+    display: grid;
+    gap: 0.5rem;
+  }
+  & .add-dialog input,
+  & .add-dialog select {
+    width: 100%;
+    background: #20252c;
+    border: 1px solid #475362;
+    color: inherit;
+    padding: 0.5rem;
+  }
+  & .add-dialog form {
+    display: grid;
+    gap: 0.5rem;
+  }
+  @media (width<1100px) {
+    grid-template-columns: 210px minmax(0, 1fr) 280px;
+  }
+}

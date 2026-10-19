@@ -4,6 +4,7 @@ import { faXmark } from "@fortawesome/free-solid-svg-icons";
 
 import { QUICK_LOADS } from "../../config/pose";
 import type { AvatarType } from "../../types/editor";
+import type { EditorMode } from "../../lib/scene";
 
 type SkinSourceTab = "name" | "upload";
 
@@ -31,6 +32,8 @@ const AVATAR_TYPE_OPTIONS: Array<{
 ];
 
 type NewFileModalProps = {
+  editorMode: EditorMode;
+  onEditorModeChange: (mode: EditorMode) => void;
   isOpen: boolean;
   startupFileName: string;
   startupUsername: string;
@@ -51,6 +54,8 @@ type NewFileModalProps = {
 };
 
 export function NewFileModal({
+  editorMode,
+  onEditorModeChange,
   isOpen,
   startupFileName,
   startupUsername,
@@ -221,6 +226,11 @@ export function NewFileModal({
                   )}
                 </div>
               )}
+              <div className="modal-section-header" style={{marginTop:"1.25rem"}}><h3>Editor</h3></div>
+              <div className="avatar-type-grid" role="group" aria-label="Editor mode">
+                <button type="button" className={editorMode==="simple"?"avatar-type-option is-active":"avatar-type-option"} aria-pressed={editorMode==="simple"} onClick={()=>onEditorModeChange("simple")}><strong>Simple editor</strong><span>Pose and export a single avatar.</span></button>
+                <button type="button" className={editorMode==="advanced"?"avatar-type-option is-active":"avatar-type-option"} aria-pressed={editorMode==="advanced"} onClick={()=>onEditorModeChange("advanced")}><strong>Advanced editor</strong><span>Arrange multiple avatars, pose each one, and match a screenshot background.</span></button>
+              </div>
             </section>
 
             <section className="startup-section modal-page-section">

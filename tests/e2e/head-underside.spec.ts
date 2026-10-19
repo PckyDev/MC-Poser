@@ -270,6 +270,7 @@ for (const skin of skins)
               name: "Create a new file",
             });
             await modal
+              .getByRole("list", { name: "Avatar type options" })
               .getByRole("button", { name: new RegExp(`^${avatar} `) })
               .click();
             if (source === "upload") {

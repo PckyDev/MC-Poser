@@ -1,0 +1,71 @@
+.scene-hierarchy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid var(--border-color, #3c4550);
+  & .panel-heading {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  & .badge {
+    font-size: 0.65rem;
+    color: #ffb45e;
+  }
+  & .actions {
+    display: flex;
+    gap: 0.3rem;
+    padding: 0.6rem;
+  }
+  & .tree {
+    overflow: auto;
+    min-height: 0;
+    padding-bottom: 1rem;
+  }
+  & .scene-label {
+    padding: 0.7rem 1rem;
+    color: #aeb9c8;
+    font-size: 0.8rem;
+    overflow-wrap: anywhere;
+  }
+  & .row {
+    display: flex;
+    align-items: center;
+    padding-right: 0.6rem;
+    gap: 0.3rem;
+  }
+  & .selected {
+    background: #ffad5720;
+  }
+  & .avatar-name {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 0;
+    padding: 0.7rem;
+    border: 0;
+    background: none;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  & .avatar-name span {
+    overflow-wrap: anywhere;
+  }
+  & .bones {
+    padding-left: 0.7rem;
+  }
+  & .joints {
+    border-left: 1px solid #3c4550;
+    margin-left: 0.7rem;
+  }
+  & [aria-pressed="true"] {
+    color: #ffad57;
+    background: #ffad5714;
+  }
+  & input {
+    accent-color: #ffad57;
+  }
+}
