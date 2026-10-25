@@ -1,8 +1,10 @@
 import { SkinViewer } from "skinview3d";
+import { validateExportSize } from "./exportSize";
 import {
   Box3,
   BoxHelper,
   GridHelper,
+  Color,
   Raycaster,
   Vector2,
   Vector3,
@@ -19,7 +21,19 @@ import {
 import { getViewerTorsoJointRoot } from "../utils/editor";
 import { getAdvancedAvatarJointObject } from "../utils/avatarRig";
 import { getPoseBones } from "../config/pose";
-import type { EditorScene, SceneAvatar, SceneCamera, Triple } from "./scene";
+import { selectedScenePart } from "./scene";
+import type {
+  EditorScene,
+  SceneAvatar,
+  SceneCamera,
+  SceneModel,
+  Triple,
+} from "./scene";
+import {
+  buildSceneModel,
+  updateSceneModel,
+  type SceneModelRuntime,
+} from "./sceneModel";
 import type { PoseSelection, PoseState } from "../types/editor";
 import type { ExportSettings } from "../components/editor/ExportModal";
 
@@ -63,6 +77,8 @@ export function createSceneRenderer(
     exporting = false;
   const avatars = new Map<string, SceneAvatarRuntime>(),
     requests = new Map<string, SceneAvatar>();
+  const models = new Map<string, SceneModelRuntime>(),
+    modelRequests = new Map<string, SceneModel>();
   const tasks = new Map<string, Promise<void>>(),
     failures = new Map<string, string>();
   let pending: Promise<void> = Promise.resolve();
@@ -73,6 +89,8 @@ export function createSceneRenderer(
       const bounds = new Box3();
       for (const avatar of avatars.values())
         if (avatar.root.visible) bounds.expandByObject(avatar.root);
+      for (const model of models.values())
+        if (model.root.visible) bounds.expandByObject(model.root);
       studio.setSceneBounds(bounds);
     }
     studio.beforeRender();
@@ -150,8 +168,33 @@ export function createSceneRenderer(
       (outline.material as any).dispose();
       outline = null;
     }
+    if (
+      scene &&
+      [...scene.avatars, ...scene.models].find(
+        (o) => o.id === scene?.selectedId,
+      )?.locked
+    )
+      return;
+    const model = scene?.selectedId ? models.get(scene.selectedId) : null;
+    if (model?.root.visible) {
+      outline = new BoxHelper(model.root, 0xffad57);
+      viewer.scene.add(outline);
+      gizmo.setMode(tool === "rotate" ? "rotate" : "translate");
+      gizmo.setSpace(tool === "rotate" ? "local" : "world");
+      gizmo.showX = gizmo.showY = gizmo.showZ = true;
+      gizmo.attach(model.root);
+      return;
+    }
     const entry = scene?.selectedId ? avatars.get(scene.selectedId) : null;
     if (!entry || !entry.root.visible) return;
+    const part = selectedScenePart(entry.source, selection);
+    if (
+      tool === "pose" &&
+      part &&
+      (entry.source.parts?.[part]?.locked ||
+        entry.source.parts?.[part]?.visible === false)
+    )
+      return;
     let object: Object3D = entry.root;
     if (tool === "pose" && selection.kind !== "none") {
       if (selection.kind === "heldItem")
@@ -220,6 +263,18 @@ export function createSceneRenderer(
     const dragging = Boolean((event as { value?: boolean }).value);
     viewer.controls.enabled = !dragging && !scene?.camera.locked;
     if (dragging || !scene?.selectedId) return;
+    const model = models.get(scene.selectedId);
+    if (model) {
+      callbacks.onTransform(model.source.id, {
+        position: model.root.position.toArray().map((v) => v / 16) as Triple,
+        rotation: [
+          model.root.rotation.x,
+          model.root.rotation.y,
+          model.root.rotation.z,
+        ].map((v) => (v * 180) / Math.PI) as Triple,
+      });
+      return;
+    }
     const entry = avatars.get(scene.selectedId),
       avatar = scene.avatars.find((a) => a.id === scene!.selectedId);
     if (!entry || !avatar) return;
@@ -278,13 +333,31 @@ export function createSceneRenderer(
     );
     const candidates: Object3D[] = [];
     for (const entry of avatars.values())
-      entry.root.traverseVisible((o) => {
-        if ((o as any).isMesh) candidates.push(o);
-      });
+      if (!entry.source.locked)
+        entry.root.traverseVisible((o) => {
+          if (
+            (o as any).isMesh &&
+            !entry.source.parts?.[
+              o.userData.scenePart as keyof SceneAvatar["parts"]
+            ]?.locked
+          )
+            candidates.push(o);
+        });
+    for (const entry of models.values())
+      if (!entry.source.locked)
+        entry.root.traverseVisible((o) => {
+          if ((o as any).isMesh) candidates.push(o);
+        });
     const hit = ray.intersectObjects(candidates, false)[0]?.object;
     if (!hit) {
       callbacks.onPick(null, { kind: "none" });
       return;
+    }
+    for (let o: Object3D | null = hit; o; o = o.parent) {
+      if (o.userData.sceneModelId) {
+        callbacks.onPick(o.userData.sceneModelId, { kind: "none" });
+        return;
+      }
     }
     for (const [id, entry] of avatars) {
       let ancestor: Object3D | null = hit;
@@ -331,10 +404,86 @@ export function createSceneRenderer(
     scene = next;
     if (cameraChanged) applyCamera(next.camera);
     grid.visible = next.showGrid;
+    const gridColor = next.gridColor ?? null;
+    if (grid.userData.color !== gridColor) {
+      const colors = grid.geometry.getAttribute("color");
+      grid.userData.defaultColors ??= colors.array.slice();
+      if (gridColor) {
+        const color = new Color(gridColor);
+        for (let i = 0; i < colors.count; i++)
+          colors.setXYZ(i, color.r, color.g, color.b);
+      } else colors.array.set(grid.userData.defaultColors);
+      colors.needsUpdate = true;
+      grid.userData.color = gridColor;
+    }
     studio.setAppearance(next.appearance);
     viewer.globalLight.intensity =
       next.appearance.mode === "stylized" ? 0.32 : 1;
     viewer.cameraLight.intensity = 0;
+    for (const id of modelRequests.keys())
+      if (!next.models.some((m) => m.id === id)) {
+        modelRequests.delete(id);
+        tasks.delete(id);
+        failures.delete(id);
+      }
+    for (const [id, entry] of models)
+      if (!next.models.some((m) => m.id === id)) {
+        entry.dispose();
+        models.delete(id);
+        modelRequests.delete(id);
+        tasks.delete(id);
+        failures.delete(id);
+      }
+    const modelBuilds = next.models.map(async (model) => {
+      const current = models.get(model.id);
+      if (current && current.source.asset === model.asset) {
+        modelRequests.delete(model.id);
+        tasks.delete(model.id);
+        failures.delete(model.id);
+        updateSceneModel(current, model);
+        current.setStylized(next.appearance.mode === "stylized");
+        return;
+      }
+      if (
+        modelRequests.get(model.id)?.asset === model.asset &&
+        tasks.has(model.id)
+      )
+        return tasks.get(model.id);
+      modelRequests.set(model.id, model);
+      failures.delete(model.id);
+      const task = (async () => {
+        try {
+          const runtime = await buildSceneModel(model);
+          const latest = scene?.models.find((m) => m.id === model.id);
+          if (disposed || modelRequests.get(model.id) !== model || !latest) {
+            runtime.dispose();
+            return;
+          }
+          models.get(model.id)?.dispose();
+          models.set(model.id, runtime);
+          viewer.scene.add(runtime.root);
+          updateSceneModel(runtime, latest);
+          runtime.setStylized(scene!.appearance.mode === "stylized");
+          refreshSelection();
+          render();
+        } catch (e) {
+          if (
+            !disposed &&
+            modelRequests.get(model.id) === model &&
+            scene?.models.some((m) => m.id === model.id)
+          ) {
+            const message =
+              e instanceof Error ? e.message : "Unable to build scene model.";
+            failures.set(model.id, message);
+            callbacks.onError(`${model.name}: ${message}`);
+          }
+        } finally {
+          if (modelRequests.get(model.id) === model) tasks.delete(model.id);
+        }
+      })();
+      tasks.set(model.id, task);
+      return task;
+    });
     for (const [id, entry] of avatars)
       if (!next.avatars.some((a) => a.id === id)) {
         entry.dispose();
@@ -399,7 +548,7 @@ export function createSceneRenderer(
       tasks.set(avatar.id, task);
       return task;
     });
-    pending = Promise.all(builds).then(() => {
+    pending = Promise.all([...builds, ...modelBuilds]).then(() => {
       if (!disposed) {
         refreshSelection();
         render();
@@ -412,6 +561,7 @@ export function createSceneRenderer(
   return {
     viewer,
     avatars,
+    models,
     sync,
     select(next: PoseSelection, nextTool: SceneTool) {
       selection = next;
@@ -424,8 +574,14 @@ export function createSceneRenderer(
       render();
     },
     async export(settings: ExportSettings) {
+      validateExportSize(settings, viewer.renderer);
       await pending;
       if (!scene) throw new Error("Scene is not ready.");
+      for (const model of scene.models)
+        if (model.visible && (!models.has(model.id) || failures.has(model.id)))
+          throw new Error(
+            `Cannot export until ${model.name} has loaded successfully.`,
+          );
       for (const avatar of scene.avatars)
         if (
           avatar.visible &&
@@ -437,7 +593,8 @@ export function createSceneRenderer(
       const output = document.createElement("canvas");
       output.width = settings.width;
       output.height = settings.height;
-      const ctx = output.getContext("2d")!;
+      const ctx = output.getContext("2d");
+      if (!ctx) throw new Error("Unable to create an export canvas at this size. Choose smaller dimensions.");
       if (settings.fileType === "jpg" || settings.backgroundMode === "solid") {
         ctx.fillStyle = settings.backgroundColor;
         ctx.fillRect(0, 0, output.width, output.height);
@@ -461,7 +618,7 @@ export function createSceneRenderer(
         grid.visible = false;
         if (outline) outline.visible = false;
         gizmo.visible = false;
-        viewer.setSize(Math.round(w), Math.round(h));
+        viewer.setSize(Math.max(1, Math.round(w)), Math.max(1, Math.round(h)));
         render();
         ctx.drawImage(canvas, x, y, w, h);
       } finally {
@@ -483,6 +640,7 @@ export function createSceneRenderer(
     dispose() {
       disposed = true;
       requests.clear();
+      modelRequests.clear();
       gizmo.detach();
       gizmo.dispose();
       outline?.geometry.dispose();
@@ -494,6 +652,8 @@ export function createSceneRenderer(
         m.dispose();
       for (const a of avatars.values()) a.dispose();
       avatars.clear();
+      for (const model of models.values()) model.dispose();
+      models.clear();
       studio.dispose();
       viewer.dispose();
       canvas.removeEventListener("pointerdown", down);

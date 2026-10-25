@@ -1,3 +1,4 @@
+import { validateExportSize } from "./lib/exportSize";
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { SkinViewer } from "skinview3d";
 import { createOuterLayerVoxelGeometry, getTexturePixelSource } from "./lib/skinVoxels";
@@ -1368,8 +1369,8 @@ function buildExportPreviewSettings(settings: ExportSettings): ExportSettings {
 
   return {
     ...settings,
-    width: Math.max(64, Math.round(settings.width * scale)),
-    height: Math.max(64, Math.round(settings.height * scale)),
+    width: Math.max(1, Math.round(settings.width * scale)),
+    height: Math.max(1, Math.round(settings.height * scale)),
   };
 }
 
@@ -1832,11 +1833,11 @@ function decodeShareExportSettings(payload: unknown): ExportSettings {
   const nextFileType = exportFileTypeFromShareCode(payload[2]);
   const nextWidth =
     typeof payload[0] === "number" && Number.isFinite(payload[0])
-      ? Math.max(64, Math.min(4096, Math.round(payload[0])))
+      ? Math.max(1, Math.round(payload[0]))
       : 1024;
   const nextHeight =
     typeof payload[1] === "number" && Number.isFinite(payload[1])
-      ? Math.max(64, Math.min(4096, Math.round(payload[1])))
+      ? Math.max(1, Math.round(payload[1]))
       : 1024;
 
   return {
@@ -5365,9 +5366,7 @@ export default function App() {
       throw new Error("Load a skin before exporting.");
     }
 
-    if (settings.width < 64 || settings.height < 64) {
-      throw new Error("Export resolution must be at least 64 x 64 pixels.");
-    }
+    validateExportSize(settings, viewer.renderer);
 
     const previousSelectedOutlineVisibility = selectedOutline?.visible ?? false;
     const previousRotationGizmoVisibility = rotationGizmo?.visible ?? false;
@@ -5491,6 +5490,7 @@ export default function App() {
       setStatus(`Exported ${label} as ${exportSettings.fileType.toUpperCase()}.`);
       setError(null);
     } catch (exportError) {
+      setExportPreviewError(exportError instanceof Error ? exportError.message : "Unable to export the current render.");
       setError(
         exportError instanceof Error
           ? exportError.message
@@ -5505,12 +5505,17 @@ export default function App() {
   function handleExportDimensionChange(
     field: "width" | "height",
     rawValue: number,
+    aspectRatio?: number,
   ): void {
-    const nextValue = Math.max(64, Math.min(4096, Math.round(rawValue)));
+    if (!Number.isFinite(rawValue)) return;
+    const nextValue = Math.max(1, Math.round(rawValue));
+    const paired = aspectRatio ? Math.max(1, Math.round(field === "width" ? nextValue / aspectRatio : nextValue * aspectRatio)) : undefined;
+    if (!Number.isSafeInteger(nextValue) || (paired !== undefined && !Number.isSafeInteger(paired))) return;
 
     setExportSettings((currentSettings) => ({
       ...currentSettings,
       [field]: nextValue,
+      ...(paired === undefined ? {} : {[field === "width" ? "height" : "width"]:paired}),
     }));
   }
 

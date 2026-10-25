@@ -115,10 +115,13 @@ export function javaDisplayGroup(model: JavaItemModel, left: boolean): Group {
   g.scale.fromArray(d.scale);
   return g;
 }
-export async function createJavaItemGroup(asset: JavaItemAsset, left: boolean): Promise<Group> {
+export async function createJavaItemGroup(asset: JavaItemAsset, left: boolean, applyHandDisplay = true): Promise<Group> {
   const group = new Group();
   group.userData.javaItem = true;
-  const display = javaDisplayGroup(asset.model, left);
+  const display = applyHandDisplay ? javaDisplayGroup(asset.model, left) : new Group();
+  // Scene models retain authored geometry, without hand-specific transforms.
+  // Java's block base is y=0; the shared geometry builder centers at (8,8,8).
+  if (!applyHandDisplay) display.position.y = 8;
   group.add(display);
   const materials = new Map<string, MeshStandardMaterial>();
   try {

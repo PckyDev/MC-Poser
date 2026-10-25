@@ -1,5 +1,12 @@
+import { useEffect, useRef, useState } from "react";
+import { SceneToolButton } from "../SceneToolButton";
+import { SceneNumberInput } from "../SceneNumberInput";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faXmark } from "@fortawesome/free-solid-svg-icons";
+import {
+  faXmark,
+  faLink,
+  faLinkSlash,
+} from "@fortawesome/free-solid-svg-icons";
 
 export type ExportFileType = "png" | "jpg" | "webp";
 export type ExportBackgroundMode = "transparent" | "solid";
@@ -12,10 +19,6 @@ export type ExportSettings = {
   backgroundColor: string;
 };
 
-const EXPORT_DIMENSION_MIN = 64;
-const EXPORT_DIMENSION_MAX = 4096;
-const EXPORT_DIMENSION_SLIDER_STEP = 16;
-
 type ExportModalProps = {
   sceneMode?: boolean;
   isOpen: boolean;
@@ -25,7 +28,11 @@ type ExportModalProps = {
   previewError: string | null;
   settings: ExportSettings;
   onClose: () => void;
-  onDimensionChange: (field: "width" | "height", value: number) => void;
+  onDimensionChange: (
+    field: "width" | "height",
+    value: number,
+    aspectRatio?: number,
+  ) => void;
   onFileTypeChange: (value: ExportFileType) => void;
   onBackgroundModeChange: (value: ExportBackgroundMode) => void;
   onBackgroundColorChange: (value: string) => void;
@@ -33,7 +40,6 @@ type ExportModalProps = {
 };
 
 export function ExportModal({
-  sceneMode=false,
   isOpen,
   isExporting,
   isPreviewLoading,
@@ -47,6 +53,14 @@ export function ExportModal({
   onBackgroundColorChange,
   onExport,
 }: ExportModalProps) {
+  const [linked, setLinked] = useState(true);
+  const ratio = useRef(settings.width / settings.height);
+  useEffect(() => {
+    if (isOpen) {
+      setLinked(true);
+      ratio.current = settings.width / settings.height;
+    }
+  }, [isOpen]);
   if (!isOpen) {
     return null;
   }
@@ -68,7 +82,8 @@ export function ExportModal({
           <div>
             <h2 id="export-modal-title">Export</h2>
             <p className="document-copy modal-copy">
-              Preview the current scene and choose the output format, resolution, and background treatment before saving.
+              Preview the current scene and choose the output format,
+              resolution, and background treatment before saving.
             </p>
           </div>
 
@@ -88,11 +103,9 @@ export function ExportModal({
           <section className="export-preview-panel modal-page-section">
             <div className="modal-section-header">
               <h3>Preview</h3>
-              <p className="modal-section-copy">
-                {sceneMode ? "The whole scene keeps its saved framing. Editor guides are hidden; a visible background image is included." : "The current viewing angle is preserved while the character is refit for the selected output size."}
-              </p>
             </div>
 
+            {previewError && previewUrl && <p role="alert">{previewError}</p>}
             <div className="export-preview-frame">
               {previewUrl ? (
                 <div
@@ -102,11 +115,17 @@ export function ExportModal({
                       : "export-preview-bounds export-preview-bounds--solid"
                   }
                 >
-                  <img className="export-preview-image" src={previewUrl} alt="Export preview" />
+                  <img
+                    className="export-preview-image"
+                    src={previewUrl}
+                    alt="Export preview"
+                  />
                 </div>
               ) : (
                 <div className="export-preview-placeholder">
-                  {isPreviewLoading ? "Generating preview..." : (previewError ?? "Preview unavailable.")}
+                  {isPreviewLoading
+                    ? "Generating preview..."
+                    : (previewError ?? "Preview unavailable.")}
                 </div>
               )}
 
@@ -119,69 +138,66 @@ export function ExportModal({
           <section className="export-settings-panel modal-page-section">
             <div className="modal-section-header">
               <h3>Settings</h3>
-              <p className="modal-section-copy">
-                Adjust the target size and file settings for the final render.
-              </p>
             </div>
 
             <div className="export-settings-grid">
-              <label className="export-setting-field" htmlFor="export-width-input">
+              <label
+                className="export-setting-field"
+                htmlFor="export-width-input"
+              >
                 <span className="form-label">Width</span>
-                <input
+                <SceneNumberInput
                   id="export-width-input"
                   className="editor-input export-control export-control--dimension"
-                  type="number"
-                  min={EXPORT_DIMENSION_MIN}
-                  max={EXPORT_DIMENSION_MAX}
+                  min={1}
                   step={1}
                   value={settings.width}
                   onChange={(event) => {
                     const nextValue = event.target.valueAsNumber;
 
                     if (Number.isFinite(nextValue)) {
-                      onDimensionChange("width", nextValue);
+                      onDimensionChange(
+                        "width",
+                        nextValue,
+                        linked ? ratio.current : undefined,
+                      );
                     }
                   }}
-                />
-                <input
-                  className="editor-range export-dimension-slider"
-                  type="range"
-                  min={EXPORT_DIMENSION_MIN}
-                  max={EXPORT_DIMENSION_MAX}
-                  step={EXPORT_DIMENSION_SLIDER_STEP}
-                  value={settings.width}
-                  aria-label="Export width"
-                  onChange={(event) => onDimensionChange("width", Number(event.target.value))}
                 />
               </label>
 
-              <label className="export-setting-field" htmlFor="export-height-input">
+              <SceneToolButton
+                className="export-ratio-toggle"
+                icon={linked ? faLink : faLinkSlash}
+                label={linked ? "Unlink aspect ratio" : "Link aspect ratio"}
+                aria-pressed={linked}
+                onClick={() => {
+                  if (!linked) ratio.current = settings.width / settings.height;
+                  setLinked(!linked);
+                }}
+              />
+              <label
+                className="export-setting-field"
+                htmlFor="export-height-input"
+              >
                 <span className="form-label">Height</span>
-                <input
+                <SceneNumberInput
                   id="export-height-input"
                   className="editor-input export-control export-control--dimension"
-                  type="number"
-                  min={EXPORT_DIMENSION_MIN}
-                  max={EXPORT_DIMENSION_MAX}
+                  min={1}
                   step={1}
                   value={settings.height}
                   onChange={(event) => {
                     const nextValue = event.target.valueAsNumber;
 
                     if (Number.isFinite(nextValue)) {
-                      onDimensionChange("height", nextValue);
+                      onDimensionChange(
+                        "height",
+                        nextValue,
+                        linked ? ratio.current : undefined,
+                      );
                     }
                   }}
-                />
-                <input
-                  className="editor-range export-dimension-slider"
-                  type="range"
-                  min={EXPORT_DIMENSION_MIN}
-                  max={EXPORT_DIMENSION_MAX}
-                  step={EXPORT_DIMENSION_SLIDER_STEP}
-                  value={settings.height}
-                  aria-label="Export height"
-                  onChange={(event) => onDimensionChange("height", Number(event.target.value))}
                 />
               </label>
             </div>
@@ -193,7 +209,9 @@ export function ExportModal({
               id="export-file-type-select"
               className="editor-select export-control export-control--select"
               value={settings.fileType}
-              onChange={(event) => onFileTypeChange(event.target.value as ExportFileType)}
+              onChange={(event) =>
+                onFileTypeChange(event.target.value as ExportFileType)
+              }
             >
               <option value="png">PNG</option>
               <option value="jpg">JPG</option>
@@ -202,12 +220,13 @@ export function ExportModal({
 
             <div className="modal-section-header">
               <h3>Background</h3>
-              <p className="modal-section-copy">
-                PNG and WEBP can preserve transparency. JPG always exports against a solid color.
-              </p>
             </div>
 
-            <div className="new-file-source-tabs" role="tablist" aria-label="Export background options">
+            <div
+              className="new-file-source-tabs"
+              role="tablist"
+              aria-label="Export background options"
+            >
               <button
                 className={
                   effectiveBackgroundMode === "transparent"
@@ -238,7 +257,10 @@ export function ExportModal({
             </div>
 
             {effectiveBackgroundMode === "solid" ? (
-              <label className="export-setting-field" htmlFor="export-background-color-input">
+              <label
+                className="export-setting-field"
+                htmlFor="export-background-color-input"
+              >
                 <span className="form-label">Background color</span>
                 <div className="export-color-row">
                   <input
@@ -246,24 +268,20 @@ export function ExportModal({
                     className="export-color-input"
                     type="color"
                     value={settings.backgroundColor}
-                    onChange={(event) => onBackgroundColorChange(event.target.value)}
+                    onChange={(event) =>
+                      onBackgroundColorChange(event.target.value)
+                    }
                   />
-                  <span className="tool-pill export-color-value">{settings.backgroundColor.toUpperCase()}</span>
+                  <span className="tool-pill export-color-value">
+                    {settings.backgroundColor.toUpperCase()}
+                  </span>
                 </div>
               </label>
-            ) : (
-              <p className="panel-note">
-                Transparent exports keep the canvas alpha channel so you can composite the render elsewhere.
-              </p>
-            )}
+            ) : null}
           </section>
         </div>
 
         <div className="document-footer modal-footer">
-          <p className="document-footer-copy modal-footer-copy">
-            Export uses the current pose, viewing angle, lighting mode, and visible skin layers.
-          </p>
-
           <div className="modal-footer-actions">
             <button className="toolbar-button" type="button" onClick={onClose}>
               Cancel
@@ -272,7 +290,9 @@ export function ExportModal({
               className="toolbar-button toolbar-button--accent"
               type="button"
               onClick={onExport}
-              disabled={isExporting || isPreviewLoading || Boolean(previewError)}
+              disabled={
+                isExporting || isPreviewLoading || Boolean(previewError)
+              }
             >
               {isExporting ? "Exporting..." : "Export Image"}
             </button>

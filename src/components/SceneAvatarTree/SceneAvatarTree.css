@@ -1,0 +1,81 @@
+.scene-avatar-tree {
+  color: #cdd5e0;
+  overflow: hidden;
+  padding-left: 18px;
+  & .part-row {
+    display: flex;
+    align-items: center;
+    min-height: 32px;
+  }
+  & button {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  & button:hover:not(:disabled) {
+    background: #ffffff0c;
+  }
+  & button:focus-visible {
+    outline: 1px solid #ffad57;
+    outline-offset: -2px;
+  }
+  & button:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  & .branch-toggle {
+    width: 22px;
+    height: 32px;
+    padding: 0;
+    flex: 0 0 22px;
+    font-size: 10px;
+  }
+  & .branch-toggle svg {
+    transition: transform 0.22s ease;
+  }
+  & .expanded {
+    transform: rotate(90deg);
+  }
+  & .part-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-align: left;
+    flex: 1;
+    min-width: 0;
+    padding: 8px 4px;
+    font-size: 13px;
+  }
+  & .part-name svg {
+    flex-shrink: 0;
+    color: #aeb9c8;
+    font-size: 11px;
+  }
+  & .part-name span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  & .part-children {
+    overflow: hidden;
+    margin-left: 32px;
+    border-left: 1px solid #3c4550;
+  }
+  & .part-children button {
+    width: 100%;
+    text-align: left;
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+  & [aria-pressed="true"] {
+    color: #ffad57;
+    background: #ffad5714;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    & .branch-toggle svg {
+      transition: none;
+    }
+  }
+}

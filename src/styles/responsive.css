@@ -104,7 +104,6 @@
 
   .export-modal-body,
   .share-modal-body,
-  .export-settings-grid,
   .item-modal-body,
   .item-preset-grid {
     grid-template-columns: 1fr;

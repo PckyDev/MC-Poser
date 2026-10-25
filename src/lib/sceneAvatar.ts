@@ -34,7 +34,7 @@ import {
 import { syncStylizedAvatarGeometry } from "./stylizedAvatar";
 import type { SceneAvatar } from "./scene";
 import type { PoseBoneId } from "../types/editor";
-import { NEUTRAL_POSE } from "../config/pose";
+import { NEUTRAL_POSE, getPoseBones } from "../config/pose";
 
 export type SceneAvatarRuntime = {
   root: Group;
@@ -70,6 +70,13 @@ export function updateSceneAvatar(
   runtime.root.scale.setScalar(avatar.scale);
   runtime.root.visible = avatar.visible;
   applyPose(runtime, avatar.pose);
+  runtime.root.traverse((o) => {
+    if (!(o instanceof Mesh)) return;
+    const part = o.userData.scenePart as PoseBoneId | undefined;
+    if (part)
+      o.visible =
+        o.userData.scenePartVisible && avatar.parts?.[part]?.visible !== false;
+  });
 }
 export async function buildSceneAvatar(
   avatar: SceneAvatar,
@@ -237,6 +244,21 @@ export async function buildSceneAvatar(
     }
     root.traverse((o) => {
       if (!(o instanceof Mesh)) return;
+      for (
+        let ancestor = o.parent;
+        ancestor && ancestor !== root;
+        ancestor = ancestor.parent
+      ) {
+        const bone = getPoseBones(avatar.avatarType).find(
+          (b) =>
+            ancestor === playerObject.skin[b.id === "torso" ? "body" : b.id],
+        );
+        if (bone) {
+          o.userData.scenePart = bone.id;
+          o.userData.scenePartVisible = o.visible;
+          break;
+        }
+      }
       syncStylizedAvatarGeometry(o, avatar.avatarType === "stylized");
       prepareStylizedGeometry(o.geometry);
       const original = Array.isArray(o.material) ? o.material : [o.material];

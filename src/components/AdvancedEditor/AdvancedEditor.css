@@ -1,4 +1,31 @@
 .advanced-editor {
+  & .inspector-heading {
+    display: flex;
+    align-items: center;
+    min-height: 49px;
+    flex-shrink: 0;
+    padding: 0 1rem;
+  }
+  & .settings-scroll.empty {
+    display: none;
+  }
+  & .object-inspector {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    border: 0;
+    padding: 0;
+    margin: 0;
+  }
+  & .object-inspector:disabled {
+    opacity: 0.55;
+  }
+  & .model-appearance {
+    padding: 1rem;
+    border-top: 1px solid #3c4550;
+  }
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr) 320px;
   flex: 1;
@@ -13,27 +40,22 @@
   }
   & .scene-toolbar {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-    padding: 0.4rem;
+    flex-wrap: nowrap;
+    gap: 0;
+    padding: 0;
     background: #22272e;
     border-bottom: 1px solid #3c4550;
   }
-  & .scene-toolbar button {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.75rem;
-  }
-  & .scene-toolbar button[aria-pressed="true"] {
-    background: #ffad5726;
-    color: #ffad57;
-  }
-  & .scene-toolbar span {
+  & .scene-toolbar .camera-hint {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-size: 0.65rem;
     color: #b0bac8;
     align-self: center;
     margin-left: auto;
+    padding: 0.5rem;
   }
   & .composition-space {
     display: flex;

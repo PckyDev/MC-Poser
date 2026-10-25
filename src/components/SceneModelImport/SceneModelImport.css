@@ -1,0 +1,22 @@
+.scene-model-import {
+  width: min(640px, calc(100vw - 48px));
+  max-height: calc(100dvh - 64px);
+  padding: 1.25rem;
+  border: 1px solid #475362;
+  background: #242a32;
+  color: #d3dce7;
+  overflow: auto;
+  &::backdrop {
+    background: #0009;
+  }
+  & header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  & h2 {
+    margin: 0;
+  }
+}

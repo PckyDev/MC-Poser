@@ -1,0 +1,14 @@
+.scene-add-menu {
+  position: relative;
+  flex: 0 0 48px;
+  display: flex;
+  & .menu-dropdown-panel {
+    left: auto;
+    right: 0;
+  }
+  & .menu-dropdown-item:focus-visible {
+    background: #ffffff14;
+    outline: 1px solid #ffad57;
+    outline-offset: -1px;
+  }
+}

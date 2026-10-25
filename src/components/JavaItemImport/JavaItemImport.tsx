@@ -4,7 +4,7 @@ import { createDefaultHeldItemAdjustments } from "../../utils/heldItems";
 import type { HeldItem } from "../../types/editor";
 import "./JavaItemImport.css";
 
-export function JavaItemImport({ onImport }: { onImport: (item: HeldItem) => void }) {
+export function JavaItemImport({ onImport, sceneModel = false }: { onImport: (item: HeldItem) => void; sceneModel?: boolean }) {
   const [model, setModel] = useState<JavaItemModel | null>(null);
   const [label, setLabel] = useState("");
   const [textures, setTextures] = useState<Record<string,string>>({});
@@ -51,7 +51,7 @@ export function JavaItemImport({ onImport }: { onImport: (item: HeldItem) => voi
   }
   const paths = model ? javaTexturePaths(model) : [];
   return <div className="java-item-import">
-    <p>Import a self-contained Java block/item model exported from Blockbench, then choose its PNG textures. Third-person hand settings are applied automatically.</p>
+    <p>Import a self-contained Java block/item model exported from Blockbench, then choose its PNG textures. {sceneModel ? "The model keeps its authored shape and size. Hand display settings are not applied to scene objects." : "Third-person hand settings are applied automatically."}</p>
     <label className="file-field">Java model JSON<input type="file" accept=".json,application/json" disabled={busy}
       onChange={event=>{void loadModel(event.target.files?.[0]); event.target.value="";}} /></label>
     {model ? <><strong>{label}</strong><span>{model.elements.length} elements · {paths.length} textures</span>
@@ -60,7 +60,7 @@ export function JavaItemImport({ onImport }: { onImport: (item: HeldItem) => voi
           onChange={event=>{void loadTexture(path,event.target.files?.[0]); event.target.value="";}} />
         {textures[path] ? <img src={textures[path]} alt={`${path} texture preview`} /> : <span>PNG required</span>}
       </label>)}
-      {!model.display.thirdperson_righthand && !model.display.thirdperson_lefthand ? <p>No third-person display settings were found. The default hand transform will be used; you can adjust it afterward.</p> : null}
+      {!sceneModel && !model.display.thirdperson_righthand && !model.display.thirdperson_lefthand ? <p>No third-person display settings were found. The default hand transform will be used; you can adjust it afterward.</p> : null}
     </> : null}
     {error ? <p role="alert" className="error">{error}</p> : null}
     <button type="button" className="toolbar-button toolbar-button--accent" disabled={busy || !model || paths.some(path=>!textures[path])} onClick={confirm}>

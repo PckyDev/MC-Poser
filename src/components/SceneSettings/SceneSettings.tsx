@@ -5,6 +5,7 @@ import {
   readSceneImage,
   type EditorScene,
   type SceneAvatar,
+  type SceneObject,
   type Triple,
 } from "../../lib/scene";
 import "./SceneSettings.css";
@@ -19,14 +20,15 @@ export function SceneSettings({
   onSettings,
 }: {
   scene: EditorScene;
-  avatar: SceneAvatar | null;
-  mode: "avatar" | "camera";
+  avatar: SceneObject | null;
+  mode: "avatar" | "camera" | "grid" | "background";
   onChange: (scene: EditorScene, group?: string) => void;
   onAvatarChange: (values: Partial<SceneAvatar>, group?: string) => void;
   onError: (message: string) => void;
   onSettings: () => void;
 }) {
   const latest = useRef(scene);
+  const isModel = avatar !== null && "asset" in avatar;
   const backgroundRequest = useRef(0);
   latest.current = scene;
   const vector = (
@@ -96,9 +98,9 @@ export function SceneSettings({
         avatar ? (
           <>
             <label>
-              Avatar name
+              {isModel ? "Model name" : "Avatar name"}
               <input
-                aria-label="Avatar name"
+                aria-label={isModel ? "Model name" : "Avatar name"}
                 value={avatar.name}
                 maxLength={100}
                 onChange={(e) =>
@@ -106,13 +108,20 @@ export function SceneSettings({
                 }
               />
             </label>
-            <button
-              className="toolbar-button"
-              type="button"
-              onClick={onSettings}
-            >
-              Avatar settings
-            </button>
+            {!isModel ? (
+              <button
+                className="toolbar-button"
+                type="button"
+                onClick={onSettings}
+              >
+                Avatar settings
+              </button>
+            ) : (
+              <p>
+                Java model · 16 model units = 1 block. Move, rotate or scale
+                this object independently.
+              </p>
+            )}
             {vector("Position (blocks)", avatar.position, (position) =>
               onAvatarChange({ position }, "position"),
             )}
@@ -125,7 +134,7 @@ export function SceneSettings({
             <label>
               Scale
               <SceneNumberInput
-                aria-label="Avatar scale"
+                aria-label={isModel ? "Model scale" : "Avatar scale"}
                 min={0.05}
                 max={20}
                 step={0.05}
@@ -146,186 +155,231 @@ export function SceneSettings({
             </label>
           </>
         ) : (
-          <p>Select an avatar in the hierarchy or canvas.</p>
+          <p>Select an object in the hierarchy or canvas.</p>
         )
       ) : (
         <>
-          <h3>Camera &amp; background</h3>
-          <p>
-            Match the screenshot with field of view, camera height and angle.
-            Lock the camera once aligned, then move the avatars into place.
-          </p>
-          <label>
-            <input
-              type="checkbox"
-              checked={scene.camera.locked}
-              onChange={(e) =>
-                onChange({
-                  ...scene,
-                  camera: { ...scene.camera, locked: e.target.checked },
-                })
-              }
-            />{" "}
-            Lock camera
-          </label>
-          {vector("Camera position", scene.camera.position, (position) =>
-            onChange(
-              { ...scene, camera: { ...scene.camera, position } },
-              "camera-position",
-            ),
-          )}
-          {vector("Look at", scene.camera.target, (target) =>
-            onChange(
-              { ...scene, camera: { ...scene.camera, target } },
-              "camera-target",
-            ),
-          )}
-          <label>
-            Vertical field of view
-            <SceneNumberInput
-              aria-label="Vertical field of view"
-              min={10}
-              max={120}
-              value={scene.camera.fov}
-              onChange={(e) => {
-                if (Number.isFinite(e.target.valueAsNumber))
-                  onChange(
-                    {
-                      ...scene,
-                      camera: {
-                        ...scene.camera,
-                        fov: Math.min(
-                          120,
-                          Math.max(10, e.target.valueAsNumber),
-                        ),
-                      },
-                    },
-                    "fov",
-                  );
-              }}
-            />
-          </label>
-          <label>
-            Camera roll
-            <SceneNumberInput
-              aria-label="Camera roll"
-              min={-180}
-              max={180}
-              value={scene.camera.roll}
-              onChange={(e) => {
-                if (Number.isFinite(e.target.valueAsNumber))
-                  onChange(
-                    {
-                      ...scene,
-                      camera: {
-                        ...scene.camera,
-                        roll: Math.min(
-                          180,
-                          Math.max(-180, e.target.valueAsNumber),
-                        ),
-                      },
-                    },
-                    "roll",
-                  );
-              }}
-            />
-          </label>
-          <button
-            type="button"
-            className="toolbar-button"
-            onClick={() => onChange({ ...scene, camera: defaultSceneCamera() })}
-          >
-            Reset scene camera
-          </button>
-          <label>
-            <input
-              type="checkbox"
-              checked={scene.showGrid}
-              onChange={(e) =>
-                onChange({ ...scene, showGrid: e.target.checked })
-              }
-            />{" "}
-            Perspective grid
-          </label>
-          <label>
-            Background image
-            <input
-              aria-label="Background image"
-              type="file"
-              accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
-              onChange={(e) => {
-                void background(e.target.files?.[0]);
-                e.target.value = "";
-              }}
-            />
-          </label>
-          {scene.background ? (
+          {mode === "camera" && (
             <>
-              <span className="filename">{scene.background.name}</span>
+              <h3>Scene camera</h3>
+              <p>
+                Match the screenshot with field of view, camera height and
+                angle. Lock the camera once aligned, then move the avatars into
+                place.
+              </p>
               <label>
                 <input
                   type="checkbox"
-                  checked={scene.background.visible}
+                  checked={scene.camera.locked}
                   onChange={(e) =>
                     onChange({
                       ...scene,
-                      background: {
-                        ...scene.background!,
-                        visible: e.target.checked,
-                      },
+                      camera: { ...scene.camera, locked: e.target.checked },
                     })
                   }
                 />{" "}
-                Show background
+                Lock camera
+              </label>
+              {vector("Camera position", scene.camera.position, (position) =>
+                onChange(
+                  { ...scene, camera: { ...scene.camera, position } },
+                  "camera-position",
+                ),
+              )}
+              {vector("Look at", scene.camera.target, (target) =>
+                onChange(
+                  { ...scene, camera: { ...scene.camera, target } },
+                  "camera-target",
+                ),
+              )}
+              <label>
+                Vertical field of view
+                <SceneNumberInput
+                  aria-label="Vertical field of view"
+                  min={10}
+                  max={120}
+                  value={scene.camera.fov}
+                  onChange={(e) => {
+                    if (Number.isFinite(e.target.valueAsNumber))
+                      onChange(
+                        {
+                          ...scene,
+                          camera: {
+                            ...scene.camera,
+                            fov: Math.min(
+                              120,
+                              Math.max(10, e.target.valueAsNumber),
+                            ),
+                          },
+                        },
+                        "fov",
+                      );
+                  }}
+                />
+              </label>
+              <label>
+                Camera roll
+                <SceneNumberInput
+                  aria-label="Camera roll"
+                  min={-180}
+                  max={180}
+                  value={scene.camera.roll}
+                  onChange={(e) => {
+                    if (Number.isFinite(e.target.valueAsNumber))
+                      onChange(
+                        {
+                          ...scene,
+                          camera: {
+                            ...scene.camera,
+                            roll: Math.min(
+                              180,
+                              Math.max(-180, e.target.valueAsNumber),
+                            ),
+                          },
+                        },
+                        "roll",
+                      );
+                  }}
+                />
               </label>
               <button
                 type="button"
                 className="toolbar-button"
-                onClick={() => onChange({ ...scene, background: null })}
+                onClick={() =>
+                  onChange({ ...scene, camera: defaultSceneCamera() })
+                }
               >
-                Remove background
+                Reset scene camera
               </button>
             </>
-          ) : null}
-          <fieldset>
-            <legend>Composition size</legend>
-            <div className="vector">
-              {["width", "height"].map((key) => (
-                <label key={key}>
-                  {key}
-                  <SceneNumberInput
-                    min={64}
-                    max={4096}
-                    aria-label={`Composition ${key}`}
-                    value={scene.frame[key as "width" | "height"]}
-                    onChange={(e) => {
-                      if (Number.isFinite(e.target.valueAsNumber))
-                        onChange(
-                          {
-                            ...scene,
-                            frame: {
-                              ...scene.frame,
-                              [key]: Math.round(
-                                Math.min(
-                                  4096,
-                                  Math.max(64, e.target.valueAsNumber),
-                                ),
-                              ),
-                            },
+          )}
+          {mode === "grid" && (
+            <>
+              <h3>Perspective grid</h3>
+              <label className="grid-visibility">
+                <span>Show perspective grid</span>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  className="grid-toggle"
+                  checked={scene.showGrid}
+                  onChange={(e) =>
+                    onChange({ ...scene, showGrid: e.target.checked })
+                  }
+                />
+              </label>
+              <label className="grid-color">
+                <span>Grid color</span>
+                <input
+                  type="color"
+                  aria-label="Grid color"
+                  value={scene.gridColor ?? "#3c4550"}
+                  onChange={(e) =>
+                    onChange(
+                      { ...scene, gridColor: e.target.value },
+                      "grid-color",
+                    )
+                  }
+                />
+              </label>
+              <button
+                type="button"
+                className="toolbar-button"
+                disabled={!scene.gridColor}
+                onClick={() => onChange({ ...scene, gridColor: null })}
+              >
+                Reset grid color
+              </button>
+            </>
+          )}
+          {mode === "background" && (
+            <>
+              <h3>Scene background</h3>
+              <label>
+                Background image
+                <input
+                  aria-label="Background image"
+                  type="file"
+                  accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+                  onChange={(e) => {
+                    void background(e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {scene.background ? (
+                <>
+                  <span className="filename">{scene.background.name}</span>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={scene.background.visible}
+                      onChange={(e) =>
+                        onChange({
+                          ...scene,
+                          background: {
+                            ...scene.background!,
+                            visible: e.target.checked,
                           },
-                          "frame",
-                        );
-                    }}
-                  />
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <p>
-            The image is a flat backdrop. Perspective is matched manually; it
-            does not automatically hide avatars behind objects in the
-            screenshot.
-          </p>
+                        })
+                      }
+                    />{" "}
+                    Show background
+                  </label>
+                  <button
+                    type="button"
+                    className="toolbar-button"
+                    onClick={() => onChange({ ...scene, background: null })}
+                  >
+                    Remove background
+                  </button>
+                </>
+              ) : null}
+            </>
+          )}
+          {mode === "camera" && (
+            <fieldset>
+              <legend>Composition size</legend>
+              <div className="vector">
+                {["width", "height"].map((key) => (
+                  <label key={key}>
+                    {key}
+                    <SceneNumberInput
+                      min={64}
+                      max={4096}
+                      aria-label={`Composition ${key}`}
+                      value={scene.frame[key as "width" | "height"]}
+                      onChange={(e) => {
+                        if (Number.isFinite(e.target.valueAsNumber))
+                          onChange(
+                            {
+                              ...scene,
+                              frame: {
+                                ...scene.frame,
+                                [key]: Math.round(
+                                  Math.min(
+                                    4096,
+                                    Math.max(64, e.target.valueAsNumber),
+                                  ),
+                                ),
+                              },
+                            },
+                            "frame",
+                          );
+                      }}
+                    />
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
+          {mode === "background" && (
+            <p>
+              The image is a flat backdrop. Perspective is matched manually; it
+              does not automatically hide avatars behind objects in the
+              screenshot.
+            </p>
+          )}
         </>
       )}
     </div>

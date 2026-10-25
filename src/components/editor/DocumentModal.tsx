@@ -38,6 +38,7 @@ const AVATAR_TYPE_OPTIONS: Array<{
 type DocumentModalPage = (typeof DOCUMENT_MODAL_PAGES)[number]["id"];
 
 type DocumentModalProps = {
+  initialPage?: DocumentModalPage;
   isOpen: boolean;
   poseFileName: string;
   skinLabel: string | null;
@@ -63,6 +64,7 @@ type DocumentModalProps = {
 };
 
 export function DocumentModal({
+  initialPage = "pose-file",
   isOpen,
   poseFileName,
   skinLabel,
@@ -91,9 +93,9 @@ export function DocumentModal({
 
   useEffect(() => {
     if (isOpen) {
-      setActivePage("pose-file");
+      setActivePage(initialPage);
     }
-  }, [isOpen]);
+  }, [isOpen, initialPage]);
 
   if (!isOpen) {
     return null;

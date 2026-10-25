@@ -15,13 +15,19 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { SceneHierarchy } from "../SceneHierarchy";
 import { SceneSettings } from "../SceneSettings";
+import { SceneToolButton } from "../SceneToolButton";
+import { SceneModelImport } from "../SceneModelImport";
+import { AppearanceControls } from "../AppearanceControls";
 import { RightSidebar } from "../editor/RightSidebar";
 import { DocumentModal } from "../editor/DocumentModal";
 import { HeldItemModal } from "../editor/HeldItemModal";
 import { ArmCapTextureModal } from "../editor/ArmCapTextureModal";
 import { createSceneRenderer, type SceneTool } from "../../lib/sceneRenderer";
 import {
+  selectedScenePart,
   createSceneAvatar,
+  createSceneModel,
+  MAX_SCENE_MODELS,
   defaultSceneCamera,
   MAX_SCENE_AVATARS,
   readSceneImage,
@@ -35,6 +41,7 @@ import {
 } from "../../utils/heldItems";
 import { applyArmCapTextureOffset } from "../../utils/armCapTextureMap";
 import {
+  getPoseBones,
   NEUTRAL_POSE,
   POSE_PRESETS,
   type PosePresetName,
@@ -82,6 +89,10 @@ export function AdvancedEditor({
     frame = useRef<HTMLDivElement>(null),
     space = useRef<HTMLDivElement>(null),
     skinInput = useRef<HTMLInputElement>(null);
+  const backgroundInput = useRef<HTMLInputElement>(null);
+  const [auxiliary, setAuxiliary] = useState<"camera" | "grid" | "background">(
+    "camera",
+  );
   const addDialog = useRef<HTMLDivElement>(null);
   const runtime = useRef<ReturnType<typeof createSceneRenderer> | null>(null),
     latest = useRef({ scene, onChange, onError });
@@ -89,6 +100,10 @@ export function AdvancedEditor({
   const [selection, setSelection] = useState<PoseSelection>({ kind: "none" }),
     [tool, setTool] = useState<SceneTool>("move"),
     [pane, setPane] = useState<"avatar" | "camera">("avatar");
+  useEffect(() => {
+    if (pane === "camera" && auxiliary === "background" && !scene.background)
+      setPane("avatar");
+  }, [scene.background, pane, auxiliary]);
   const [ready, setReady] = useState(false),
     [localDocument, setLocalDocument] = useState(false),
     [addOpen, setAddOpen] = useState(false),
@@ -100,6 +115,7 @@ export function AdvancedEditor({
       target: ArmCapTextureTarget;
     } | null>(null);
   const [error, setError] = useState("");
+  const [modelImportOpen, setModelImportOpen] = useState(false);
   function onError(message: string) {
     setError(message);
     reportError(message);
@@ -118,6 +134,36 @@ export function AdvancedEditor({
     };
   }, [addOpen]);
   const avatar = scene.avatars.find((a) => a.id === scene.selectedId) ?? null;
+  const model = scene.models.find((m) => m.id === scene.selectedId) ?? null;
+  function patchObject(
+    values: Partial<SceneAvatar>,
+    group?: string,
+    id = latest.current.scene.selectedId,
+  ) {
+    const current = latest.current.scene;
+    if (!id) return;
+    const object = [...current.avatars, ...current.models].find(
+      (o) => o.id === id,
+    );
+    if (
+      object?.locked &&
+      Object.keys(values).some((key) => key !== "locked" && key !== "visible")
+    )
+      return;
+    if (!current.models.some((m) => m.id === id)) {
+      patchAvatar(values, group, id);
+      return;
+    }
+    latest.current.onChange(
+      {
+        ...current,
+        models: current.models.map((m) =>
+          m.id === id ? { ...m, ...values } : m,
+        ),
+      },
+      group ? `${id}:${group}` : undefined,
+    );
+  }
   function patchAvatar(
     values: Partial<SceneAvatar>,
     group?: string,
@@ -125,6 +171,29 @@ export function AdvancedEditor({
   ) {
     const current = latest.current.scene;
     if (!id) return;
+    const object = [...current.avatars, ...current.models].find(
+      (o) => o.id === id,
+    );
+    if (
+      object?.locked &&
+      Object.keys(values).some((key) => key !== "locked" && key !== "visible")
+    )
+      return;
+    const target = current.avatars.find((a) => a.id === id);
+    if (target && values.pose) {
+      const pose = { ...values.pose };
+      for (const bone of getPoseBones(target.avatarType))
+        if (target.parts?.[bone.id]?.locked)
+          for (const field of bone.fields)
+            pose[field.key] = target.pose[field.key];
+      values = { ...values, pose };
+    }
+    if (target && values.heldItems) {
+      const heldItems = { ...values.heldItems };
+      for (const arm of ["leftArm", "rightArm"] as const)
+        if (target.parts?.[arm]?.locked) heldItems[arm] = target.heldItems[arm];
+      values = { ...values, heldItems };
+    }
     onChange(
       {
         ...current,
@@ -138,13 +207,15 @@ export function AdvancedEditor({
   function select(id: string | null, next: PoseSelection) {
     setSelection(next);
     if (next.kind !== "none") setTool("pose");
+    else if (latest.current.scene.models.some((m) => m.id === id))
+      setTool("move");
     setPane("avatar");
     onChange({ ...latest.current.scene, selectedId: id }, undefined, true);
   }
   useEffect(() => {
     const r = createSceneRenderer(canvas.current!, {
       onPick: select,
-      onTransform: (id, values) => patchAvatar(values, undefined, id),
+      onTransform: (id, values) => patchObject(values, undefined, id),
       onCamera: (camera) => {
         const current = latest.current.scene;
         latest.current.onChange({ ...current, camera }, "camera-orbit");
@@ -187,6 +258,15 @@ export function AdvancedEditor({
   useEffect(() => {
     setItemArm(null);
     setCap(null);
+    if (scene.selectedId) setPane("avatar");
+    if (
+      latest.current.scene.models.some(
+        (m) => m.id === latest.current.scene.selectedId,
+      )
+    ) {
+      setSelection({ kind: "none" });
+      setTool((current) => (current === "pose" ? "move" : current));
+    }
   }, [scene.selectedId]);
   useImperativeHandle(ref, () => ({
     export: (settings) => runtime.current!.export(settings),
@@ -200,7 +280,12 @@ export function AdvancedEditor({
       ),
   }));
   useEffect(() => {
-    if (documentOpen && !latest.current.scene.selectedId)
+    if (
+      documentOpen &&
+      !latest.current.scene.avatars.some(
+        (a) => a.id === latest.current.scene.selectedId,
+      )
+    )
       select(latest.current.scene.avatars[0]!.id, { kind: "none" });
   }, [documentOpen]);
   function add(skin: LoadedSkin) {
@@ -277,18 +362,140 @@ export function AdvancedEditor({
   const documentAvatar = avatar ?? scene.avatars[0]!;
   return (
     <main className="advanced-editor" aria-label="Advanced editor">
+      <input
+        hidden
+        ref={backgroundInput}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        aria-label="Add scene background image"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (!file || latest.current.scene.background) return;
+          try {
+            const source = await readSceneImage(file),
+              image = await createImageBitmap(file);
+            const width = image.width,
+              height = image.height;
+            image.close();
+            if (latest.current.scene.background) return;
+            const factor = Math.min(1, 4096 / Math.max(width, height));
+            onChange({
+              ...latest.current.scene,
+              selectedId: null,
+              background: {
+                source,
+                name: file.name,
+                width,
+                height,
+                visible: true,
+              },
+              frame: {
+                width: Math.max(64, Math.round(width * factor)),
+                height: Math.max(64, Math.round(height * factor)),
+              },
+            });
+            setPane("camera");
+            setAuxiliary("background");
+          } catch (error) {
+            onError(
+              error instanceof Error
+                ? error.message
+                : "Unable to read background.",
+            );
+          }
+        }}
+      />
+
       <SceneHierarchy
         scene={scene}
         selection={selection}
         onSelect={select}
-        onCamera={() => setPane("camera")}
-        onVisible={(id, visible) => patchAvatar({ visible }, undefined, id)}
+        cameraSelected={pane === "camera" ? auxiliary : null}
+        onRename={(id, name) => patchObject({ name }, undefined, id)}
+        onSettings={(id) => {
+          select(id, { kind: "none" });
+          setUsername(scene.avatars.find((a) => a.id === id)?.skin.label ?? "");
+          setLocalDocument(true);
+        }}
+        onBackground={() => backgroundInput.current?.click()}
+        onPartChange={(id, part, changes) => {
+          const a = scene.avatars.find((a) => a.id === id);
+          if (!a) return;
+          patchAvatar(
+            {
+              parts: {
+                ...a.parts,
+                [part]: {
+                  visible: true,
+                  locked: false,
+                  ...a.parts?.[part],
+                  ...changes,
+                },
+              },
+            },
+            undefined,
+            id,
+          );
+        }}
+        onLock={(id, locked) =>
+          id === "camera"
+            ? onChange({ ...scene, camera: { ...scene.camera, locked } })
+            : patchObject({ locked }, undefined, id)
+        }
+        onCamera={(id) => {
+          setAuxiliary(id as "camera" | "grid" | "background");
+          setSelection({ kind: "none" });
+          onChange({ ...scene, selectedId: null }, undefined, true);
+          setPane("camera");
+        }}
+        onVisible={(id, visible) => {
+          if (id === "grid") onChange({ ...scene, showGrid: visible });
+          else if (id === "background" && scene.background)
+            onChange({
+              ...scene,
+              background: { ...scene.background, visible },
+            });
+          else patchObject({ visible }, undefined, id);
+        }}
+        onAddModel={() => {
+          if (scene.models.length >= MAX_SCENE_MODELS) {
+            onError(`Scenes support up to ${MAX_SCENE_MODELS} Java models.`);
+            return;
+          }
+          setModelImportOpen(true);
+        }}
         onAdd={() => {
           setError("");
           setUsername("");
           setAddOpen(true);
         }}
-        onDuplicate={() => {
+        onDuplicate={(id) => {
+          const model = scene.models.find((m) => m.id === id);
+          const avatar = scene.avatars.find((a) => a.id === id);
+          if (model) {
+            if (scene.models.length >= MAX_SCENE_MODELS) {
+              onError(`Scenes support up to ${MAX_SCENE_MODELS} Java models.`);
+              return;
+            }
+            const copy = {
+              ...model,
+              locked: false,
+              id: crypto.randomUUID(),
+              name: `${model.name} copy`,
+              position: [
+                model.position[0] + 1.5,
+                model.position[1],
+                model.position[2],
+              ] as [number, number, number],
+            };
+            onChange({
+              ...scene,
+              models: [...scene.models, copy],
+              selectedId: copy.id,
+            });
+            return;
+          }
           if (!avatar) return;
           if (scene.avatars.length >= MAX_SCENE_AVATARS) {
             onError(`Scenes support up to ${MAX_SCENE_AVATARS} avatars.`);
@@ -296,6 +503,7 @@ export function AdvancedEditor({
           }
           const copy = {
             ...avatar,
+            locked: false,
             id: crypto.randomUUID(),
             name: `${avatar.name} copy`,
             position: [
@@ -310,13 +518,29 @@ export function AdvancedEditor({
             selectedId: copy.id,
           });
         }}
-        onRemove={() => {
+        onRemove={(id) => {
+          if (id === "background") {
+            onChange({ ...scene, background: null });
+            return;
+          }
+          const model = scene.models.find((m) => m.id === id);
+          if (
+            [...scene.avatars, ...scene.models].find((o) => o.id === id)?.locked
+          )
+            return;
+          if (model) {
+            onChange({
+              ...scene,
+              models: scene.models.filter((m) => m.id !== model.id),
+              selectedId: null,
+            });
+            return;
+          }
           if (scene.avatars.length > 1)
             onChange({
               ...scene,
-              avatars: scene.avatars.filter((a) => a.id !== scene.selectedId),
-              selectedId: scene.avatars.find((a) => a.id !== scene.selectedId)!
-                .id,
+              avatars: scene.avatars.filter((a) => a.id !== id),
+              selectedId: scene.avatars.find((a) => a.id !== id)!.id,
             });
         }}
       />
@@ -346,18 +570,20 @@ export function AdvancedEditor({
               { id: "pose", label: "Pose avatar", icon: faPerson },
             ] as const
           ).map((t) => (
-            <button
-              type="button"
-              className="toolbar-button"
+            <SceneToolButton
+              icon={t.icon}
+              label={
+                model && t.id !== "pose"
+                  ? t.label.replace("avatar", "model")
+                  : t.label
+              }
               key={t.id}
               aria-pressed={tool === t.id}
+              disabled={t.id === "pose" && Boolean(model)}
               onClick={() => setTool(t.id)}
-            >
-              <FontAwesomeIcon icon={t.icon} />
-              {t.label}
-            </button>
+            />
           ))}
-          <span>
+          <span className="camera-hint">
             {scene.camera.locked
               ? "Camera locked"
               : "Drag to orbit · right-drag to pan · scroll to zoom"}
@@ -373,118 +599,161 @@ export function AdvancedEditor({
           </div>
         </div>
         <div className="scene-status">
-          {scene.avatars.length} avatars · {scene.frame.width} ×{" "}
-          {scene.frame.height} · Positions in Minecraft blocks
+          {scene.avatars.length}{" "}
+          {scene.avatars.length === 1 ? "avatar" : "avatars"} ·{" "}
+          {scene.models.length} {scene.models.length === 1 ? "model" : "models"}{" "}
+          · {scene.frame.width} × {scene.frame.height} · Positions in Minecraft
+          blocks
         </div>
       </section>
       <div className="inspector">
-        <div
-          className="inspector-tabs"
-          role="tablist"
-          aria-label="Scene inspector"
-        >
-          {(["avatar", "camera"] as const).map((p) => (
-            <button
-              type="button"
-              role="tab"
-              aria-selected={pane === p}
-              className="toolbar-button"
-              key={p}
-              onClick={() => setPane(p)}
-            >
-              {p === "avatar" ? "Avatar" : "Camera / Background"}
-            </button>
-          ))}
+        <div className="panel-heading inspector-heading">
+          <h2>Inspector</h2>
         </div>
-        <div
-          className={
-            pane === "avatar" && avatar
-              ? "settings-scroll"
-              : "settings-scroll full"
+        <fieldset
+          className="object-inspector"
+          disabled={
+            pane === "avatar" &&
+            Boolean(
+              (model ?? avatar)?.locked ||
+                (avatar &&
+                  avatar.parts?.[selectedScenePart(avatar, selection)!]
+                    ?.locked),
+            )
           }
         >
-          <SceneSettings
-            mode={pane}
-            scene={scene}
-            avatar={avatar}
-            onChange={onChange}
-            onAvatarChange={patchAvatar}
-            onError={onError}
-            onSettings={() => {
-              setUsername(avatar?.skin.label ?? "");
-              setLocalDocument(true);
-            }}
-          />
-        </div>
-        {pane === "avatar" && avatar ? (
-          <RightSidebar
-            appearance={scene.appearance}
-            onAppearanceChange={(appearance) =>
-              onChange({ ...scene, appearance }, "appearance")
+          <div
+            className={
+              pane === "avatar" && avatar
+                ? selection.kind === "none"
+                  ? "settings-scroll"
+                  : "settings-scroll empty"
+                : "settings-scroll full"
             }
-            avatarType={avatar.avatarType}
-            heldItems={avatar.heldItems}
-            isArmCapTextureMapAvailable={true}
-            selectedSelection={selection}
-            pose={avatar.pose}
-            showOuterLayer={avatar.showOuterLayer}
-            showOuterLayerIn3d={avatar.showOuterLayerIn3d}
-            showHeldItems={avatar.showHeldItems}
-            onOpenArmCapTextureModal={(armId, target) =>
-              setCap({ armId, target })
-            }
-            onOpenHeldItemModal={setItemArm}
-            onRemoveHeldItem={(arm) =>
-              patchAvatar({ heldItems: { ...avatar.heldItems, [arm]: null } })
-            }
-            onResetHeldItemAdjustments={(arm) => {
-              const item = avatar.heldItems[arm];
-              if (item)
-                patchAvatar({
-                  heldItems: {
-                    ...avatar.heldItems,
-                    [arm]: {
-                      ...item,
-                      adjustments: createDefaultHeldItemAdjustments(),
-                    },
-                  },
-                });
-            }}
-            onUpdateHeldItemAdjustment={(arm, key, value) => {
-              const item = avatar.heldItems[arm];
-              if (item)
-                patchAvatar(
-                  {
+          >
+            {(pane !== "avatar" || !avatar || selection.kind === "none") && (
+              <SceneSettings
+                mode={pane === "avatar" ? "avatar" : auxiliary}
+                scene={scene}
+                avatar={model ?? avatar}
+                onChange={onChange}
+                onAvatarChange={patchObject}
+                onError={onError}
+                onSettings={() => {
+                  setUsername(avatar?.skin.label ?? "");
+                  setLocalDocument(true);
+                }}
+              />
+            )}
+            {pane === "avatar" && model ? (
+              <div className="model-appearance">
+                <AppearanceControls
+                  value={scene.appearance}
+                  onChange={(appearance) =>
+                    onChange({ ...scene, appearance }, "appearance")
+                  }
+                />
+              </div>
+            ) : null}
+          </div>
+          {pane === "avatar" && avatar ? (
+            <RightSidebar
+              appearance={scene.appearance}
+              onAppearanceChange={(appearance) =>
+                onChange({ ...scene, appearance }, "appearance")
+              }
+              avatarType={avatar.avatarType}
+              heldItems={avatar.heldItems}
+              isArmCapTextureMapAvailable={true}
+              selectedSelection={selection}
+              pose={avatar.pose}
+              showOuterLayer={avatar.showOuterLayer}
+              showOuterLayerIn3d={avatar.showOuterLayerIn3d}
+              showHeldItems={avatar.showHeldItems}
+              onOpenArmCapTextureModal={(armId, target) =>
+                setCap({ armId, target })
+              }
+              onOpenHeldItemModal={setItemArm}
+              onRemoveHeldItem={(arm) =>
+                patchAvatar({ heldItems: { ...avatar.heldItems, [arm]: null } })
+              }
+              onResetHeldItemAdjustments={(arm) => {
+                const item = avatar.heldItems[arm];
+                if (item)
+                  patchAvatar({
                     heldItems: {
                       ...avatar.heldItems,
                       [arm]: {
                         ...item,
-                        adjustments: { ...item.adjustments, [key]: value },
+                        adjustments: createDefaultHeldItemAdjustments(),
                       },
                     },
-                  },
-                  `item:${arm}:${key}`,
-                );
-            }}
-            onUpdatePose={(key, value) =>
-              patchAvatar(
-                { pose: { ...avatar.pose, [key]: value } },
-                `pose:${key}`,
-              )
-            }
-            onToggleHeldItems={(showHeldItems) =>
-              patchAvatar({ showHeldItems })
-            }
-            onToggleOuterLayer={(showOuterLayer) =>
-              patchAvatar({ showOuterLayer })
-            }
-            onToggleOuterLayerIn3d={(showOuterLayerIn3d) =>
-              patchAvatar({ showOuterLayerIn3d })
-            }
-          />
-        ) : null}
+                  });
+              }}
+              onUpdateHeldItemAdjustment={(arm, key, value) => {
+                const item = avatar.heldItems[arm];
+                if (item)
+                  patchAvatar(
+                    {
+                      heldItems: {
+                        ...avatar.heldItems,
+                        [arm]: {
+                          ...item,
+                          adjustments: { ...item.adjustments, [key]: value },
+                        },
+                      },
+                    },
+                    `item:${arm}:${key}`,
+                  );
+              }}
+              onUpdatePose={(key, value) =>
+                patchAvatar(
+                  { pose: { ...avatar.pose, [key]: value } },
+                  `pose:${key}`,
+                )
+              }
+              onToggleHeldItems={(showHeldItems) =>
+                patchAvatar({ showHeldItems })
+              }
+              onToggleOuterLayer={(showOuterLayer) =>
+                patchAvatar({ showOuterLayer })
+              }
+              onToggleOuterLayerIn3d={(showOuterLayerIn3d) =>
+                patchAvatar({ showOuterLayerIn3d })
+              }
+            />
+          ) : null}
+        </fieldset>
       </div>
+      {modelImportOpen ? (
+        <SceneModelImport
+          onClose={() => setModelImportOpen(false)}
+          onImport={(name, asset) => {
+            const current = latest.current.scene;
+            if (current.models.length >= MAX_SCENE_MODELS) {
+              onError(`Scenes support up to ${MAX_SCENE_MODELS} Java models.`);
+              return;
+            }
+            const next = createSceneModel(name, asset);
+            next.position = [
+              current.camera.target[0],
+              0,
+              current.camera.target[2],
+            ];
+            onChange({
+              ...current,
+              models: [...current.models, next],
+              selectedId: next.id,
+            });
+            setSelection({ kind: "none" });
+            setTool("move");
+            setPane("avatar");
+            setModelImportOpen(false);
+          }}
+        />
+      ) : null}
       <DocumentModal
+        initialPage={localDocument ? "avatar-type" : "pose-file"}
         isOpen={documentOpen || localDocument}
         poseFileName={poseFileName}
         skinLabel={documentAvatar.skin.label}
@@ -512,6 +781,7 @@ export function AdvancedEditor({
         onQuickLoad={(name) => void byName(false, name)}
         onOpenFilePicker={() => skinInput.current?.click()}
         onAvatarTypeChange={(avatarType) => {
+          if (documentAvatar.locked) return;
           const current = latest.current.scene;
           onChange({
             ...current,

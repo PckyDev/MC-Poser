@@ -14,6 +14,7 @@ are not currently supported.
 - Load skins from Mojang username lookups or local PNG files.
 - Pose characters with sliders, presets, and in-viewport rotation gizmos.
 - Choose Simple for one avatar or Advanced for a multi-avatar scene with a background image.
+- Place standalone Blockbench Java models alongside avatars in Advanced scenes.
 - Switch between default, bobblehead, advanced, and stylized avatar rigs.
 - Bend the lower torso, spine, elbows, and knees with per-joint controls.
 - Support classic, slim, and auto-detect arm models.
@@ -42,9 +43,23 @@ to rename, duplicate, hide, remove, or pose it independently. **Move avatar** an
 its selected body part. The inspector also provides position in Minecraft blocks,
 rotation, scale, individual skin/rig settings, layers, and held items.
 
-Under **Camera / Background**, import a PNG, JPEG, or WebP screenshot. Adjust the
-camera position, look-at point, vertical field of view, and roll to match its
-perspective. Use the perspective grid as a guide, then lock the camera while
+Each hierarchy row has visibility and lock controls that appear on hover or
+keyboard focus. Hidden and locked states remain visible. Right-click an object
+for show/hide, lock/unlock, duplicate, and delete actions. Locks protect objects
+from canvas selection and editing, and are saved with the scene. The single
+scene camera can be locked but cannot be hidden, duplicated, or deleted.
+
+Expand an avatar to control individual body parts, including their visibility
+and pose locks. Right-click an avatar to open its settings. Clicking empty
+hierarchy space clears selection; right-clicking it opens the add menu.
+Use **+ > Scene Background** to add a background image. The hierarchy lists the
+camera, perspective grid, and background, with visibility controls for the grid
+and image. Only one background can be added at a time.
+
+The **Inspector** follows the selected object or body part. Select **Scene
+camera** to adjust camera position, look-at point, vertical field of view, and
+roll to match the background's perspective. Use the perspective grid as a guide,
+then lock the camera while
 placing characters. This is manual perspective matching: a flat screenshot does
 not automatically hide avatars behind objects or provide 3D world geometry.
 
@@ -55,6 +70,32 @@ links, and diagnostics include the scene. Large images or multiple detailed
 avatars can exceed the share-link limit; send the `.mcpose` file instead.
 Background uploads are limited to 18 MB and 8,192 pixels per edge, with a
 composition size up to 4,096 pixels per edge.
+
+Select **Perspective grid** to change its color or visibility. Resetting its color
+restores the original grid appearance. Grid settings are saved with the scene.
+
+The Export dialog links width and height by default. Use the link button between
+them to change dimensions independently. Output resolution is no longer capped
+at 4,096 pixels; the browser's rendering capabilities and available memory still
+determine the largest supported export. The preview remains small while editing.
+
+#### Standalone Java models
+
+Use **+ > Java Model** in the hierarchy heading to place a self-contained Blockbench
+Java block/item JSON and its PNG textures in the scene. Models have independent
+names, visibility, position, rotation, and scale, and can be duplicated or removed.
+Select them in the hierarchy or canvas, then use **Move model** or **Rotate model**.
+Right-click a model and choose **Rename** to edit its name directly in the row.
+Press Enter or click away to save, or Escape to cancel.
+They support both render styles and are included in undo/redo, saved projects,
+shared scenes, diagnostics, and image exports. Textures are embedded when imported.
+
+Scene models use their authored geometry, not their third-person hand display
+settings. At scale 1, 16 model units equal one Minecraft block; the placement
+origin is the center of the block's base (Java coordinates 8, 0, 8).
+Up to 32 models can be placed alongside avatars. The existing importer limits
+apply: self-contained cuboid models, up to 2,048 elements, PNG textures up to
+2048 × 2048, and no unresolved parent models or `.bbmodel` projects.
 
 ### Stylized rendering
 

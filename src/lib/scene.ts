@@ -4,10 +4,13 @@ import type {
   HeldItemsState,
   LoadedSkin,
   PoseState,
+  PoseBoneId,
+  PoseSelection,
 } from "../types/editor";
-import { NEUTRAL_POSE } from "../config/pose";
+import { NEUTRAL_POSE, getPoseBones } from "../config/pose";
 import { createDefaultAdvancedArmCapTextureOffsets } from "../utils/armCapTextureMap";
 import { cloneHeldItems } from "../utils/heldItems";
+import { normalizeJavaItemAsset, type JavaItemAsset } from "./javaItemModel";
 import {
   normalizeRenderAppearance,
   type RenderAppearance,
@@ -19,6 +22,8 @@ export type SceneAvatar = {
   id: string;
   name: string;
   visible: boolean;
+  locked: boolean;
+  parts: Partial<Record<PoseBoneId, { visible: boolean; locked: boolean }>>;
   position: Triple;
   rotation: Triple;
   scale: number;
@@ -38,8 +43,43 @@ export type SceneCamera = {
   roll: number;
   locked: boolean;
 };
+export function selectedScenePart(
+  avatar: SceneAvatar,
+  selection: PoseSelection,
+) {
+  if (selection.kind === "none") return undefined;
+  if (selection.kind === "bone" || selection.kind === "heldItem")
+    return selection.id;
+  return getPoseBones(avatar.avatarType).find((b) =>
+    b.fields.some((f) => f.key === selection.id),
+  )?.id;
+}
+export type SceneModel = Pick<
+  SceneAvatar,
+  "id" | "name" | "visible" | "locked" | "position" | "rotation" | "scale"
+> & {
+  asset: JavaItemAsset;
+};
+export type SceneObject = SceneAvatar | SceneModel;
+export const MAX_SCENE_MODELS = 32;
+export function createSceneModel(
+  name: string,
+  asset: JavaItemAsset,
+): SceneModel {
+  return {
+    id: crypto.randomUUID(),
+    name,
+    asset,
+    locked: false,
+    visible: true,
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+    scale: 1,
+  };
+}
 export type EditorScene = {
   avatars: SceneAvatar[];
+  models: SceneModel[];
   selectedId: string | null;
   appearance: RenderAppearance;
   camera: SceneCamera;
@@ -52,6 +92,7 @@ export type EditorScene = {
   } | null;
   frame: { width: number; height: number };
   showGrid: boolean;
+  gridColor: string | null;
 };
 export const MAX_SCENE_AVATARS = 12;
 export const defaultSceneCamera = (): SceneCamera => ({
@@ -69,6 +110,8 @@ export function createSceneAvatar(
     id: crypto.randomUUID(),
     name: skin.label || "Avatar",
     skin,
+    parts: {},
+    locked: false,
     visible: true,
     position: [0, 0, 0],
     rotation: [0, 0, 0],
@@ -89,12 +132,14 @@ export function createEditorScene(
 ): EditorScene {
   return {
     avatars: [avatar],
+    models: [],
     selectedId: avatar.id,
     appearance: normalizeRenderAppearance(appearance),
     camera: defaultSceneCamera(),
     background: null,
     frame: { width: 1600, height: 900 },
     showGrid: true,
+    gridColor: null,
   };
 }
 const object = (v: unknown): v is Record<string, any> =>
@@ -138,6 +183,16 @@ export function normalizeEditorScene(
       id,
       name: typeof a.name === "string" ? a.name.slice(0, 100) : "Avatar",
       visible: a.visible !== false,
+      locked: a.locked === true,
+      parts: Object.fromEntries(
+        getPoseBones("advanced").map(({ id }) => [
+          id,
+          {
+            visible: a.parts?.[id]?.visible !== false,
+            locked: a.parts?.[id]?.locked === true,
+          },
+        ]),
+      ),
       position: triple(a.position, [0, 0, 0]),
       rotation: triple(a.rotation, [0, 0, 0], 36000),
       scale: finite(a.scale, 1, 0.05, 20),
@@ -150,6 +205,32 @@ export function normalizeEditorScene(
       showOuterLayerIn3d: a.showOuterLayerIn3d === true,
       showHeldItems: a.showHeldItems !== false,
     });
+  });
+  if (
+    raw.models !== undefined &&
+    (!Array.isArray(raw.models) || raw.models.length > MAX_SCENE_MODELS)
+  )
+    throw new Error(`Scenes support up to ${MAX_SCENE_MODELS} Java models.`);
+  const models = (raw.models ?? []).map((m: unknown): SceneModel => {
+    if (!object(m)) throw new Error("Invalid scene model.");
+    const id =
+      typeof m.id === "string" && m.id.length <= 100
+        ? m.id
+        : crypto.randomUUID();
+    if (ids.has(id)) throw new Error("Scene object IDs must be unique.");
+    ids.add(id);
+    return {
+      ...createSceneModel(
+        typeof m.name === "string" ? m.name.slice(0, 100) : "Java model",
+        normalizeJavaItemAsset(m.asset),
+      ),
+      id,
+      visible: m.visible !== false,
+      locked: m.locked === true,
+      position: triple(m.position, [0, 0, 0]),
+      rotation: triple(m.rotation, [0, 0, 0], 36000),
+      scale: finite(m.scale, 1, 0.05, 20),
+    };
   });
   const defaults = defaultSceneCamera(),
     c = object(raw.camera) ? raw.camera : {};
@@ -184,6 +265,7 @@ export function normalizeEditorScene(
   }
   return {
     avatars,
+    models,
     selectedId: ids.has(raw.selectedId) ? raw.selectedId : avatars[0]!.id,
     appearance: normalizeRenderAppearance(raw.appearance),
     camera,
@@ -193,6 +275,10 @@ export function normalizeEditorScene(
       height: Math.round(finite(raw.frame?.height, 900, 64, 4096)),
     },
     showGrid: raw.showGrid !== false,
+    gridColor:
+      typeof raw.gridColor === "string" && /^#[0-9a-f]{6}$/i.test(raw.gridColor)
+        ? raw.gridColor
+        : null,
   };
 }
 

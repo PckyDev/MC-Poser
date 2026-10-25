@@ -1,0 +1,50 @@
+.scene-tool-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+  &:hover:not(:disabled) {
+    background: #ffffff14;
+  }
+  &[aria-pressed="true"],
+  &[aria-expanded="true"] {
+    background: #ffad5726;
+    color: #ffad57;
+  }
+  &:focus-visible {
+    outline: 2px solid #ffad57;
+    outline-offset: -3px;
+  }
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+.scene-tool-tooltip {
+  position: fixed;
+  z-index: 200;
+  max-width: 180px;
+  padding: 6px 9px;
+  border: 1px solid #46505d;
+  background: #20242b;
+  color: #dce3ed;
+  box-shadow: 0 4px 12px #0006;
+  font-size: 12px;
+  pointer-events: none;
+}

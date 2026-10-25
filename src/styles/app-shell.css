@@ -308,7 +308,7 @@
 
 .menu-dropdown-panel {
   position: absolute;
-  top: calc(100% + 0.35rem);
+  top: 100%;
   left: 0;
   z-index: 30;
   min-width: 13rem;

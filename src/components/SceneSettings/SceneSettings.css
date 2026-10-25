@@ -1,4 +1,59 @@
 .scene-settings {
+  & label.grid-visibility,
+  & label.grid-color {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  & input.grid-toggle[type="checkbox"] {
+    appearance: none;
+    width: 36px;
+    height: 20px;
+    flex: 0 0 36px;
+    padding: 2px;
+    margin: 0;
+    border: 1px solid #637080;
+    border-radius: 10px;
+    background: #343d48;
+    cursor: pointer;
+    transition:
+      background 0.16s ease,
+      border-color 0.16s ease;
+    &::before {
+      content: "";
+      display: block;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #d5dce5;
+      transition: transform 0.16s ease;
+    }
+    &:checked {
+      background: #ffad57;
+      border-color: #ffad57;
+    }
+    &:checked::before {
+      transform: translateX(16px);
+      background: #252a31;
+    }
+    &:focus-visible {
+      outline: 2px solid #ffad57;
+      outline-offset: 3px;
+    }
+  }
+  & .grid-color input {
+    width: 42px;
+    height: 28px;
+    padding: 3px;
+    cursor: pointer;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    & input.grid-toggle,
+    & input.grid-toggle::before {
+      transition: none;
+    }
+  }
   display: grid;
   gap: 0.7rem;
   padding: 1rem;
