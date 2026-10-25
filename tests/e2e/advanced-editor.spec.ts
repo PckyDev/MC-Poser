@@ -1139,7 +1139,11 @@ test("Advanced creation, hierarchy, independent posing, transforms, undo and por
   const { skin, background, errors } = await setup(page);
   await create(page, skin);
   await objectAction(page, "TestSkin", "Duplicate");
-  await page.getByLabel("Avatar name", { exact: true }).fill("Second avatar");
+  await page
+    .getByRole("button", { name: "Rename avatar", exact: true })
+    .click();
+  await page.getByLabel("Rename avatar in Inspector").fill("Second avatar");
+  await page.getByLabel("Rename avatar in Inspector").press("Enter");
   const positionField = page.getByLabel("Position (blocks) X", { exact: true });
   await positionField.fill("");
   await positionField.pressSequentially("-1.5");
@@ -1290,20 +1294,35 @@ async function objectAction(page: Page, name: string, action: string) {
   await page.getByRole("menuitem", { name: action, exact: true }).click();
 }
 
-test('Simple editor exports above 4096 pixels',async({page})=>{
- const {skin,errors}=await setup(page);
- await page.getByRole('button',{name:'Create New File',exact:true}).click();
- await page.getByRole('tab',{name:'Upload PNG',exact:true}).click();
- await page.locator('input[accept=".png,image/png"]').nth(1).setInputFiles(file('TestSkin.png',skin));
- await page.getByRole('button',{name:'Create From Uploaded PNG',exact:true}).click();
- await page.getByRole('button',{name:'Export',exact:true}).click();
- const modal=page.getByRole('dialog',{name:'Export',exact:true});
- await modal.getByRole('button',{name:'Unlink aspect ratio',exact:true}).click();
- await modal.getByLabel('Width',{exact:true}).fill('5000');await modal.getByLabel('Height',{exact:true}).fill('128');
- await modal.getByLabel('Height',{exact:true}).blur();
- const pending=page.waitForEvent('download');await modal.getByRole('button',{name:'Export Image',exact:true}).click();
- const buffer=await readFile((await (await pending).path())!);
- expect(buffer.readUInt32BE(16)).toBe(5000);expect(buffer.readUInt32BE(20)).toBe(128);expect(errors).toEqual([]);
+test("Simple editor exports above 4096 pixels", async ({ page }) => {
+  const { skin, errors } = await setup(page);
+  await page
+    .getByRole("button", { name: "Create New File", exact: true })
+    .click();
+  await page.getByRole("tab", { name: "Upload PNG", exact: true }).click();
+  await page
+    .locator('input[accept=".png,image/png"]')
+    .nth(1)
+    .setInputFiles(file("TestSkin.png", skin));
+  await page
+    .getByRole("button", { name: "Create From Uploaded PNG", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Export", exact: true }).click();
+  const modal = page.getByRole("dialog", { name: "Export", exact: true });
+  await modal
+    .getByRole("button", { name: "Unlink aspect ratio", exact: true })
+    .click();
+  await modal.getByLabel("Width", { exact: true }).fill("5000");
+  await modal.getByLabel("Height", { exact: true }).fill("128");
+  await modal.getByLabel("Height", { exact: true }).blur();
+  const pending = page.waitForEvent("download");
+  await modal
+    .getByRole("button", { name: "Export Image", exact: true })
+    .click();
+  const buffer = await readFile((await (await pending).path())!);
+  expect(buffer.readUInt32BE(16)).toBe(5000);
+  expect(buffer.readUInt32BE(20)).toBe(128);
+  expect(errors).toEqual([]);
 });
 
 test("Export dimensions link both ways and exceed the old resolution cap", async ({
@@ -1529,7 +1548,9 @@ test("Inline model renaming and selection-driven Inspector", async ({
     page.getByRole("switch", { name: "Show perspective grid", exact: true }),
   ).toHaveCount(0);
   await page.getByRole("button", { name: "TestSkin", exact: true }).click();
-  await expect(page.getByLabel("Avatar name", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Rename avatar", exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Head", exact: true }).click();
   await expect(page.getByLabel("Avatar name", { exact: true })).toHaveCount(0);
   await expect(
@@ -1741,9 +1762,8 @@ test("Part visibility is independent across every avatar rig, arm model and laye
     // @ts-expect-error Browser module
     const { createSceneAvatar } = await import("/src/lib/scene.ts");
     // @ts-expect-error Browser module
-    const { buildSceneAvatar, updateSceneAvatar } = await import(
-      "/src/lib/sceneAvatar.ts"
-    );
+    const { buildSceneAvatar, updateSceneAvatar } =
+      await import("/src/lib/sceneAvatar.ts");
     const failures: string[] = [];
     for (const avatarType of ["default", "bobblehead", "advanced", "stylized"])
       for (const modelPreference of ["default", "slim"])
@@ -2031,4 +2051,260 @@ test("Hierarchy visibility, locks, context menus and attached dropdowns", async 
   await mkdir(".debug/hierarchy", { recursive: true });
   await page.screenshot({ path: ".debug/hierarchy/review.png" });
   expect(errors).toEqual([]);
+});
+
+test("Avatar rename controls and remembered collapsible Inspector sections", async ({
+  page,
+}) => {
+  const { skin, errors } = await setup(page);
+  await create(page, skin);
+  await objectAction(page, "TestSkin", "Rename");
+  const rowInput = page.getByRole("textbox", {
+    name: "Rename avatar",
+    exact: true,
+  });
+  await expect(rowInput).toBeFocused();
+  expect(
+    await rowInput.evaluate((e: HTMLInputElement) => [
+      e.selectionStart,
+      e.selectionEnd,
+    ]),
+  ).toEqual([0, 8]);
+  await rowInput.fill("Grian");
+  await rowInput.press("Enter");
+  await expect(
+    page.getByRole("heading", { name: "Grian", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Rename avatar", exact: true })
+    .click();
+  const headerInput = page.getByLabel("Rename avatar in Inspector");
+  await expect(headerInput).toBeFocused();
+  expect(
+    await headerInput.evaluate((e: HTMLInputElement) => [
+      e.selectionStart,
+      e.selectionEnd,
+    ]),
+  ).toEqual([0, 5]);
+  await headerInput.fill("Cancelled");
+  await headerInput.press("Escape");
+  await expect(
+    page.getByRole("heading", { name: "Grian", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Rename avatar", exact: true })
+    .click();
+  await headerInput.fill("Player");
+  await headerInput.press("Enter");
+  await expect(
+    page.getByRole("treeitem", { name: "Player", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Avatar name", { exact: true })).toHaveCount(0);
+  for (const name of ["Transform", "Pose", "Render options"]) {
+    await page
+      .locator(".inspector")
+      .getByRole("button", { name, exact: true })
+      .click();
+    await expect(
+      page.locator(".inspector").getByRole("button", { name, exact: true }),
+    ).toHaveAttribute("aria-expanded", "false");
+  }
+  await page.getByRole("button", { name: "Scene camera", exact: true }).click();
+  await page.getByRole("button", { name: "Player", exact: true }).click();
+  for (const name of ["Transform", "Pose", "Render options"])
+    await expect(
+      page.locator(".inspector").getByRole("button", { name, exact: true }),
+    ).toHaveAttribute("aria-expanded", "false");
+  await page.getByRole("button", { name: "Transform", exact: true }).click();
+  await expect(page.getByLabel("Position (blocks) X")).toBeVisible();
+  await page
+    .locator(".inspector")
+    .getByRole("button", { name: "Pose", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Render options", exact: true })
+    .click();
+  await expect(
+    page.getByRole("combobox", { name: /Render style/ }),
+  ).toBeVisible();
+  await expect
+    .poll(() =>
+      page
+        .getByRole("button", { name: "Render options", exact: true })
+        .evaluate((el) => el.getAnimations({ subtree: true }).length),
+    )
+    .toBe(0);
+  await page.screenshot({ path: ".debug/hierarchy/avatar-inspector.png" });
+  await page
+    .getByRole("button", { name: "Avatar settings", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("Inspector stacks sections, selects silhouette parts and anchors header tooltips", async ({
+  page,
+}) => {
+  const { skin, errors } = await setup(page);
+  await page.setViewportSize({ width: 1715, height: 892 });
+  await create(page, skin);
+  const inspector = page.locator(".inspector");
+  const rename = inspector.getByRole("button", {
+    name: "Rename avatar",
+    exact: true,
+  });
+  const settings = inspector.getByRole("button", {
+    name: "Avatar settings",
+    exact: true,
+  });
+  expect((await settings.boundingBox())!.x).toBeGreaterThan(
+    (await rename.boundingBox())!.x,
+  );
+  for (const button of [rename, settings]) {
+    await button.hover();
+    const tip = page.getByRole("tooltip");
+    await expect(tip).toBeVisible();
+    const a = (await button.boundingBox())!,
+      b = (await tip.boundingBox())!;
+    expect(b.x + b.width).toBeGreaterThan(a.x);
+    expect(b.y).toBeGreaterThanOrEqual(a.y + a.height);
+    expect(b.y - a.y - a.height).toBeLessThan(12);
+    expect(b.x + b.width).toBeLessThanOrEqual(1715);
+  }
+  const picker = page.getByRole("group", { name: "Avatar pose selector" });
+  for (const [name, slider] of [
+    ["head", "Head pitch"],
+    ["torso", "Body pitch"],
+    ["left arm", "Left arm pitch"],
+    ["right arm", "Right arm pitch"],
+    ["left leg", "Left leg pitch"],
+    ["right leg", "Right leg pitch"],
+  ]) {
+    await picker
+      .getByRole("button", { name: "Select " + name, exact: true })
+      .click();
+    await expect(
+      page.getByRole("slider", { name: slider, exact: true }),
+    ).toBeVisible();
+    await expect(
+      picker.getByRole("button", { name: "Select " + name, exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+  }
+  await inspector.getByRole("button", { name: "Pose", exact: true }).click();
+  await expect
+    .poll(async () => {
+      const pose = (await inspector
+        .getByRole("button", { name: "Pose", exact: true })
+        .boundingBox())!;
+      const render = (await inspector
+        .getByRole("button", { name: "Render options", exact: true })
+        .boundingBox())!;
+      return Math.abs(render.y - pose.y - pose.height);
+    })
+    .toBeLessThan(4);
+  await inspector.getByRole("button", { name: "Pose", exact: true }).click();
+  await page.getByRole("button", { name: "TestSkin", exact: true }).click();
+  await expect
+    .poll(() =>
+      inspector
+        .locator(".object-inspector")
+        .evaluate((el) => el.scrollHeight > el.clientHeight),
+    )
+    .toBe(true);
+  expect(
+    await inspector
+      .locator(
+        ".settings-scroll, .collapsible-panel > .body, .panel-content--scroll",
+      )
+      .evaluateAll((els) =>
+        els.every(
+          (el) => !["auto", "scroll"].includes(getComputedStyle(el).overflowY),
+        ),
+      ),
+  ).toBe(true);
+  await page.mouse.move(900, 200);
+  await page.screenshot({ path: ".debug/hierarchy/stacked-inspector.png" });
+  expect(errors).toEqual([]);
+});
+
+test("Scrollbar gutters stay stable while Inspector sections expand", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 800 });
+  const { skin } = await setup(page);
+  await create(page, skin);
+  const inspector = page.locator(".inspector");
+  const region = inspector.locator(".object-inspector");
+  for (const name of ["Transform", "Pose", "Render options"])
+    await inspector.getByRole("button", { name, exact: true }).click();
+  await expect(region).toHaveAttribute("data-scroll-region", "");
+  await expect(region).not.toHaveAttribute("data-scroll-overflow");
+  const before = await inspector.getByRole("button", { name: "Transform", exact: true }).boundingBox();
+  for (const name of ["Transform", "Pose", "Render options"])
+    await inspector.getByRole("button", { name, exact: true }).click();
+  await expect(region).toHaveAttribute("data-scroll-overflow", "");
+  const after = await inspector.getByRole("button", { name: "Transform", exact: true }).boundingBox();
+  expect(after!.x).toBe(before!.x);
+  expect(after!.width).toBe(before!.width);
+  await expect.poll(() => region.evaluate(el => getComputedStyle(el).getPropertyValue("--scroll-thumb").trim())).toBe("rgb(101, 113, 129)");
+  for (const name of ["Transform", "Pose", "Render options"])
+    await inspector.getByRole("button", { name, exact: true }).click();
+  await expect(region).not.toHaveAttribute("data-scroll-overflow");
+  await expect.poll(() => region.evaluate(el => getComputedStyle(el).getPropertyValue("--scroll-thumb").trim())).toBe("rgba(0, 0, 0, 0)");
+});
+
+test("Only hierarchy content scrolls and empty gutters match headers", async ({ page }) => {
+  const { skin } = await setup(page);
+  await create(page, skin);
+  const hierarchy = page.getByRole("complementary", { name: "Scene hierarchy" });
+  await expect(hierarchy).not.toHaveAttribute("data-scroll-region");
+  await expect(hierarchy.locator(".hierarchy-scroll")).not.toHaveAttribute("data-scroll-region");
+  const content = hierarchy.locator(".hierarchy-content-scroll");
+  await expect(content).toHaveAttribute("data-scroll-region", "");
+  const header = hierarchy.locator(".panel-heading");
+  expect((await header.boundingBox())!.width).toBe(await hierarchy.evaluate(el => el.clientWidth));
+  expect((await content.boundingBox())!.y).toBeGreaterThanOrEqual((await header.boundingBox())!.y + (await header.boundingBox())!.height);
+  for (const name of ["Transform", "Pose", "Render options"])
+    await page.locator(".inspector").getByRole("button", { name, exact: true }).click();
+  await expect(page.locator(".object-inspector")).not.toHaveAttribute("data-scroll-overflow");
+  await expect.poll(() => page.locator(".object-inspector").evaluate(el => parseFloat(getComputedStyle(el).getPropertyValue("--scroll-gutter-width")))).toBeGreaterThan(0);
+  await expect(hierarchy.locator(".tree")).not.toHaveAttribute("data-scroll-region");
+  await expect.poll(() => page.locator(".inspector .collapsible-panel > .body").evaluateAll(els => Math.max(...els.map(el => el.getBoundingClientRect().height)))).toBe(0);
+  await page.mouse.move(800, 200);
+  await page.screenshot({ path: ".debug/hierarchy/gutter-colors.png" });
+});
+
+test("Empty Inspector guidance is centered", async ({ page }) => {
+  const { skin } = await setup(page);
+  await create(page, skin);
+  const hierarchy = page.getByRole("complementary", { name: "Scene hierarchy" });
+  const box = (await hierarchy.boundingBox())!;
+  await page.mouse.click(box.x + 60, box.y + box.height - 30);
+  const state = page.locator(".inspector .empty-state");
+  await expect(state).toBeVisible();
+  await expect(state).toHaveText("Select an object in the scene or hierarchy to inspect its options.");
+  const content = (await page.locator(".object-inspector").boundingBox())!;
+  const empty = (await state.boundingBox())!;
+  expect(Math.abs(empty.y + empty.height / 2 - content.y - content.height / 2)).toBeLessThan(2);
+  expect(Math.abs(empty.x + empty.width / 2 - content.x - content.width / 2)).toBeLessThan(8);
+  await page.screenshot({ path: ".debug/hierarchy/empty-inspector.png" });
+});
+
+test("Transform controls use three compact aligned rows", async ({ page }) => {
+  const { skin } = await setup(page);
+  await create(page, skin);
+  for (const width of [1715, 1000]) {
+    await page.setViewportSize({ width, height: 892 });
+    const fields = page.locator(".transform-fields");
+    for (const name of ["Position (blocks)", "Rotation (degrees)"]) {
+      const inputs = await Promise.all(["X", "Y", "Z"].map(axis => page.getByLabel(name + " " + axis).boundingBox()));
+      expect(new Set(inputs.map(box => box!.y)).size).toBe(1);
+      const legend = await fields.locator("legend").filter({ hasText: name.split(" (")[0] }).boundingBox();
+      expect(legend!.x + legend!.width).toBeLessThan(inputs[0]!.x);
+      expect(Math.abs(legend!.y - inputs[0]!.y)).toBeLessThan(2);
+    }
+    expect(await fields.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  }
+  await page.getByLabel("Position (blocks) X").fill("2");
+  await page.getByLabel("Position (blocks) X").press("Tab");
+  await expect(page.getByLabel("Position (blocks) X")).toHaveValue("2");
+  await page.screenshot({ path: ".debug/hierarchy/compact-transform.png" });
 });

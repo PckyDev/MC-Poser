@@ -1,15 +1,36 @@
 .advanced-editor {
   & .inspector-heading {
+    gap: 0;
     display: flex;
     align-items: center;
     min-height: 49px;
     flex-shrink: 0;
-    padding: 0 1rem;
+    padding: 0 0 0 1rem;
+    & h2 {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    & .header-rename {
+      flex: 1;
+      min-width: 0;
+      width: 0;
+      background: #20252c;
+      color: inherit;
+      border: 1px solid #ffad55;
+      padding: 0.35rem;
+    }
+    & .scene-tool-button {
+      flex-shrink: 0;
+    }
   }
   & .settings-scroll.empty {
     display: none;
   }
   & .object-inspector {
+    overflow-y: auto;
+    overflow-x: hidden;
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -128,20 +149,36 @@
     color: #ffad57;
   }
   & .settings-scroll {
-    overflow: auto;
-    max-height: 42%;
+    overflow: visible;
+    max-height: none;
     flex-shrink: 0;
-    border-bottom: 1px solid #3c4550;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  }
+  & .settings-scroll.full:has(.scene-settings.is-empty) {
+    display: flex;
+    flex: 1;
+    border-bottom: 0;
   }
   & .settings-scroll.full {
     max-height: none;
-    flex: 1;
+    flex: none;
   }
   & .inspector .editor-sidebar {
-    flex: 1;
+    flex: none;
+    overflow: visible;
     min-height: 0;
     width: auto;
     border: 0;
+  }
+  & .object-inspector .collapsible-panel {
+    max-height: none;
+    flex: none;
+    & > .body {
+      overflow: clip;
+    }
+  }
+  & .object-inspector .panel-content--scroll {
+    overflow: visible;
   }
   & .add-dialog {
     width: min(480px, 90vw);

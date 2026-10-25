@@ -50,7 +50,7 @@
   align-items: start;
   padding: 0.95rem 1rem 0.8rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-  background: rgba(0, 0, 0, 0.12);
+  background: var(--bg-panel-heading);
 }
 
 .panel-heading h2 {

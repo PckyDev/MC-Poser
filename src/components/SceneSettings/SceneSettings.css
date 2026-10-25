@@ -1,4 +1,56 @@
 .scene-settings {
+  &.is-empty {
+    flex: 1;
+    place-items: center;
+    min-height: 0;
+    padding: 2rem;
+  }
+  & .empty-state {
+    display: grid;
+    justify-items: center;
+    gap: 1.25rem;
+    text-align: center;
+    max-width: 240px;
+    color: var(--text-dim);
+    & svg { font-size: 3rem; opacity: 0.65; }
+    & p { font-size: 0.9rem; line-height: 1.6; }
+  }
+
+  & .collapsible-panel {
+    max-height: none;
+    margin: -1rem;
+  }
+  & .transform-fields {
+    display: grid;
+    gap: 0.65rem;
+    padding: 0.85rem 0.65rem;
+    & legend {
+      float: left;
+      width: 60px;
+      margin: 0;
+      line-height: 30px;
+    }
+    & .vector {
+      margin-left: 64px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.35rem;
+      & label {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 0.25rem;
+      }
+    }
+    & > label {
+      display: grid;
+      grid-template-columns: 60px minmax(0, 1fr);
+      align-items: center;
+      gap: 4px;
+    }
+    & input { padding: 0.35rem 0.2rem; height: 30px; font-size: 0.78rem; }
+  }
+
   & label.grid-visibility,
   & label.grid-color {
     flex-direction: row;

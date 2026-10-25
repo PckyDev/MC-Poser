@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AvatarPartPicker } from "../AvatarPartPicker";
 import { CollapsiblePanel } from "../CollapsiblePanel";
 import { AppearanceControls } from "../AppearanceControls";
 import type { RenderAppearance } from "../../lib/renderAppearance";
@@ -12,6 +13,7 @@ import type {
   HeldItemArmId,
   HeldItemsState,
   PoseSelection,
+  PoseBoneId,
   PoseState,
 } from "../../types/editor";
 import {
@@ -86,6 +88,9 @@ function formatHeldItemAdjustmentValue(field: HeldItemAdjustmentField, value: nu
 }
 
 type RightSidebarProps = {
+  onSelectPart?: (id: PoseBoneId) => void;
+  lockedParts?: string[];
+
   appearance: RenderAppearance;
   onAppearanceChange: (value: RenderAppearance) => void;
   avatarType: AvatarType;
@@ -108,6 +113,8 @@ type RightSidebarProps = {
 };
 
 export function RightSidebar({
+  onSelectPart,
+  lockedParts,
   appearance,
   onAppearanceChange,
   avatarType,
@@ -163,7 +170,7 @@ export function RightSidebar({
 
   const selectionTitle =
     selectedSelection.kind === "none"
-      ? "No part selected"
+      ? "Pose"
       : selectedSelection.kind === "bone"
         ? selectedBone.label
         : selectedSelection.kind === "heldItem"
@@ -408,14 +415,10 @@ export function RightSidebar({
 
   return (
     <aside className="editor-sidebar editor-sidebar--right">
-      <section className="editor-panel editor-panel--stretch">
-        <div className="panel-heading">
-          <div>
-            <h2>{selectionTitle}</h2>
-          </div>
-        </div>
-
+      <CollapsiblePanel title={onSelectPart ? "Pose" : selectionTitle} storageKey="parts" stretch={!onSelectPart}>
         <div className="panel-content panel-content--scroll panel-content--stacked">
+          {onSelectPart && <AvatarPartPicker onSelect={onSelectPart} selected={selectedSelection.kind === "none" ? null : selectedBone.id} lockedParts={lockedParts} />}
+
           {selectedFields.length > 0 ? (
             <div className="slider-stack">
               {selectedFields.map((field) => (
@@ -457,6 +460,7 @@ export function RightSidebar({
                   <input
                     className="editor-range"
                     type="range"
+                    aria-label={field.label}
                     min={field.min}
                     max={field.max}
                     step={1}
@@ -478,9 +482,9 @@ export function RightSidebar({
 
           {selectedHeldItemArmId ? renderHeldItemSection(selectedHeldItemArmId, heldItem) : null}
         </div>
-      </section>
+      </CollapsiblePanel>
 
-      <CollapsiblePanel title="Render options">
+      <CollapsiblePanel title="Render options" storageKey="render-options">
         <div className="panel-content panel-content--stacked">
           <AppearanceControls value={appearance} onChange={onAppearanceChange} />
           <label className="toggle-row">

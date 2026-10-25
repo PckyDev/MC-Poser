@@ -1,9 +1,13 @@
 .scene-hierarchy {
-  & .hierarchy-scroll {
+  &.editor-sidebar { overflow: clip; }
+  & .hierarchy-content-scroll {
     flex: 1;
-    overflow: auto;
+    overflow-y: auto;
+    overflow-x: hidden;
     min-height: 0;
   }
+  & .hierarchy-scroll { overflow: visible; width: 100%; }
+  & .panel-heading { flex-shrink: 0; }
   & .object-row {
     display: grid;
     grid-template-columns: 34px minmax(0, 1fr) auto;
@@ -144,7 +148,7 @@
     padding: 0.6rem;
   }
   & .tree {
-    overflow: auto;
+    overflow: visible;
     min-height: 0;
     padding-bottom: 1rem;
   }

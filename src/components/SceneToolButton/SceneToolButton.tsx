@@ -1,4 +1,11 @@
-import { useEffect, useId, useState, type ButtonHTMLAttributes } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useId,
+  useState,
+  type ButtonHTMLAttributes,
+} from "react";
 import { createPortal } from "react-dom";
 import type { IconDefinition } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -14,6 +21,14 @@ export function SceneToolButton({
   icon: IconDefinition;
 }) {
   const id = useId();
+  const tooltip = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    if (!anchor || !tooltip.current) return;
+    const box = tooltip.current.getBoundingClientRect();
+    tooltip.current.style.left = `${Math.max(8, Math.min(anchor.left + anchor.width / 2 - box.width / 2, innerWidth - box.width - 8))}px`;
+    tooltip.current.style.top = `${anchor.bottom + 6 + box.height <= innerHeight - 8 ? anchor.bottom + 6 : Math.max(8, anchor.top - box.height - 6)}px`;
+  });
+
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
   useEffect(() => {
     if (!anchor) return;
@@ -68,6 +83,7 @@ export function SceneToolButton({
         !props["aria-expanded"] &&
         createPortal(
           <span
+            ref={tooltip}
             id={id}
             role="tooltip"
             className="scene-tool-tooltip"

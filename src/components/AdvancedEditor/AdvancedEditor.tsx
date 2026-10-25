@@ -12,6 +12,8 @@ import {
   faRotate,
   faPerson,
   faXmark,
+  faGear,
+  faPen,
 } from "@fortawesome/free-solid-svg-icons";
 import { SceneHierarchy } from "../SceneHierarchy";
 import { SceneSettings } from "../SceneSettings";
@@ -90,6 +92,16 @@ export function AdvancedEditor({
     space = useRef<HTMLDivElement>(null),
     skinInput = useRef<HTMLInputElement>(null);
   const backgroundInput = useRef<HTMLInputElement>(null);
+  const [headerRename, setHeaderRename] = useState<string | null>(null);
+  const headerInput = useRef<HTMLInputElement>(null);
+  const cancelHeaderRename = useRef(false);
+  useEffect(() => {
+    if (headerRename) {
+      cancelHeaderRename.current = false;
+      headerInput.current?.focus();
+      headerInput.current?.select();
+    }
+  }, [headerRename]);
   const [auxiliary, setAuxiliary] = useState<"camera" | "grid" | "background">(
     "camera",
   );
@@ -608,7 +620,60 @@ export function AdvancedEditor({
       </section>
       <div className="inspector">
         <div className="panel-heading inspector-heading">
-          <h2>Inspector</h2>
+          {pane === "avatar" && avatar ? (
+            <>
+              {headerRename === avatar.id ? (
+                <input
+                  key={avatar.id}
+                  ref={headerInput}
+                  className="header-rename"
+                  aria-label="Rename avatar in Inspector"
+                  defaultValue={avatar.name}
+                  maxLength={100}
+                  onBlur={(e) => {
+                    const name = e.currentTarget.value.trim();
+                    if (
+                      !cancelHeaderRename.current &&
+                      name &&
+                      name !== avatar.name
+                    )
+                      patchObject({ name }, undefined, avatar.id);
+                    setHeaderRename(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      e.currentTarget.blur();
+                    }
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      cancelHeaderRename.current = true;
+                      setHeaderRename(null);
+                    }
+                  }}
+                />
+              ) : (
+                <h2>{avatar.name}</h2>
+              )}
+              <SceneToolButton
+                label="Rename avatar"
+                icon={faPen}
+                disabled={avatar.locked}
+                onClick={() => setHeaderRename(avatar.id)}
+              />
+              <SceneToolButton
+                label="Avatar settings"
+                icon={faGear}
+                disabled={avatar.locked}
+                onClick={() => {
+                  setUsername(avatar.skin.label ?? "");
+                  setLocalDocument(true);
+                }}
+              />
+            </>
+          ) : (
+            <h2>Inspector</h2>
+          )}
         </div>
         <fieldset
           className="object-inspector"
@@ -616,9 +681,8 @@ export function AdvancedEditor({
             pane === "avatar" &&
             Boolean(
               (model ?? avatar)?.locked ||
-                (avatar &&
-                  avatar.parts?.[selectedScenePart(avatar, selection)!]
-                    ?.locked),
+              (avatar &&
+                avatar.parts?.[selectedScenePart(avatar, selection)!]?.locked),
             )
           }
         >
@@ -639,10 +703,6 @@ export function AdvancedEditor({
                 onChange={onChange}
                 onAvatarChange={patchObject}
                 onError={onError}
-                onSettings={() => {
-                  setUsername(avatar?.skin.label ?? "");
-                  setLocalDocument(true);
-                }}
               />
             )}
             {pane === "avatar" && model ? (
@@ -658,6 +718,13 @@ export function AdvancedEditor({
           </div>
           {pane === "avatar" && avatar ? (
             <RightSidebar
+              onSelectPart={(id) => {
+                if (!avatar.parts?.[id]?.locked)
+                  select(avatar.id, { kind: "bone", id });
+              }}
+              lockedParts={Object.entries(avatar.parts ?? {})
+                .filter(([, state]) => state.locked)
+                .map(([id]) => id)}
               appearance={scene.appearance}
               onAppearanceChange={(appearance) =>
                 onChange({ ...scene, appearance }, "appearance")

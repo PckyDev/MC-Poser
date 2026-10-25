@@ -1,3 +1,4 @@
+import { installScrollbarBehavior } from "./lib/scrollbars";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
@@ -6,6 +7,7 @@ import "./index.css";
 import { installDiagnosticErrorCapture } from "./lib/diagnostics";
 
 installDiagnosticErrorCapture();
+installScrollbarBehavior();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

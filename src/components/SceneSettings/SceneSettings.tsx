@@ -1,3 +1,6 @@
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faArrowPointer } from "@fortawesome/free-solid-svg-icons";
+import { CollapsiblePanel } from "../CollapsiblePanel";
 import { useRef } from "react";
 import { SceneNumberInput } from "../SceneNumberInput";
 import {
@@ -17,7 +20,6 @@ export function SceneSettings({
   onChange,
   onAvatarChange,
   onError,
-  onSettings,
 }: {
   scene: EditorScene;
   avatar: SceneObject | null;
@@ -25,7 +27,6 @@ export function SceneSettings({
   onChange: (scene: EditorScene, group?: string) => void;
   onAvatarChange: (values: Partial<SceneAvatar>, group?: string) => void;
   onError: (message: string) => void;
-  onSettings: () => void;
 }) {
   const latest = useRef(scene);
   const isModel = avatar !== null && "asset" in avatar;
@@ -38,7 +39,7 @@ export function SceneSettings({
     step = 0.1,
   ) => (
     <fieldset>
-      <legend>{label}</legend>
+      <legend title={label}>{mode === "avatar" ? label.split(" (")[0] : label}</legend>
       <div className="vector">
         {["X", "Y", "Z"].map((axis, i) => (
           <label key={axis}>
@@ -93,69 +94,64 @@ export function SceneSettings({
     }
   }
   return (
-    <div className="scene-settings">
+    <div className={`scene-settings ${mode === "avatar" && !avatar ? "is-empty" : ""}`}>
       {mode === "avatar" ? (
         avatar ? (
           <>
-            <label>
-              {isModel ? "Model name" : "Avatar name"}
-              <input
-                aria-label={isModel ? "Model name" : "Avatar name"}
-                value={avatar.name}
-                maxLength={100}
-                onChange={(e) =>
-                  onAvatarChange({ name: e.target.value }, "avatar-name")
-                }
-              />
-            </label>
-            {!isModel ? (
-              <button
-                className="toolbar-button"
-                type="button"
-                onClick={onSettings}
-              >
-                Avatar settings
-              </button>
-            ) : (
-              <p>
-                Java model · 16 model units = 1 block. Move, rotate or scale
-                this object independently.
-              </p>
+            {isModel && (
+              <label>
+                Model name
+                <input
+                  aria-label="Model name"
+                  value={avatar.name}
+                  maxLength={100}
+                  onChange={(e) =>
+                    onAvatarChange({ name: e.target.value }, "avatar-name")
+                  }
+                />
+              </label>
             )}
-            {vector("Position (blocks)", avatar.position, (position) =>
-              onAvatarChange({ position }, "position"),
-            )}
-            {vector(
-              "Rotation (degrees)",
-              avatar.rotation,
-              (rotation) => onAvatarChange({ rotation }, "rotation"),
-              1,
-            )}
-            <label>
-              Scale
-              <SceneNumberInput
-                aria-label={isModel ? "Model scale" : "Avatar scale"}
-                min={0.05}
-                max={20}
-                step={0.05}
-                value={avatar.scale}
-                onChange={(e) => {
-                  if (Number.isFinite(e.target.valueAsNumber))
-                    onAvatarChange(
-                      {
-                        scale: Math.min(
-                          20,
-                          Math.max(0.05, e.target.valueAsNumber),
-                        ),
-                      },
-                      "scale",
-                    );
-                }}
-              />
-            </label>
+            <CollapsiblePanel title="Transform" storageKey="transform">
+              <div className="transform-fields">
+                {vector("Position (blocks)", avatar.position, (position) =>
+                  onAvatarChange({ position }, "position"),
+                )}
+                {vector(
+                  "Rotation (degrees)",
+                  avatar.rotation,
+                  (rotation) => onAvatarChange({ rotation }, "rotation"),
+                  1,
+                )}
+                <label>
+                  Scale
+                  <SceneNumberInput
+                    aria-label={isModel ? "Model scale" : "Avatar scale"}
+                    min={0.05}
+                    max={20}
+                    step={0.05}
+                    value={avatar.scale}
+                    onChange={(e) => {
+                      if (Number.isFinite(e.target.valueAsNumber))
+                        onAvatarChange(
+                          {
+                            scale: Math.min(
+                              20,
+                              Math.max(0.05, e.target.valueAsNumber),
+                            ),
+                          },
+                          "scale",
+                        );
+                    }}
+                  />
+                </label>
+              </div>
+            </CollapsiblePanel>
           </>
         ) : (
-          <p>Select an object in the hierarchy or canvas.</p>
+          <div className="empty-state">
+            <FontAwesomeIcon icon={faArrowPointer} aria-hidden="true" />
+            <p>Select an object in the scene or hierarchy to inspect its options.</p>
+          </div>
         )
       ) : (
         <>

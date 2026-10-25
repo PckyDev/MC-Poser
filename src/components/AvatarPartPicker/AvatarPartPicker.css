@@ -1,0 +1,56 @@
+.avatar-part-picker {
+  display: grid;
+  grid-template-columns: 24px 24px 24px 24px;
+  grid-template-rows: 48px 70px 70px;
+  gap: 4px;
+  justify-content: center;
+  align-self: center;
+  padding: 4px;
+  & button {
+    appearance: none;
+    border: 1px solid #7e8b9c;
+    border-radius: 2px;
+    background: #596676;
+    cursor: pointer;
+    padding: 0;
+    transition:
+      background 120ms ease,
+      border-color 120ms ease;
+    &:hover:not(:disabled),
+    &[aria-pressed="true"] {
+      background: #aa713e;
+      border-color: #ffad57;
+    }
+    &:focus-visible {
+      outline: 2px solid #ffad57;
+      outline-offset: 2px;
+    }
+    &:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+  }
+  & .head {
+    grid-area: 1 / 2 / 2 / 4;
+  }
+  & .torso {
+    grid-area: 2 / 2 / 3 / 4;
+  }
+  & .rightArm {
+    grid-area: 2 / 1;
+  }
+  & .leftArm {
+    grid-area: 2 / 4;
+  }
+  & .rightLeg {
+    grid-area: 3 / 2;
+  }
+  & .leftLeg {
+    grid-area: 3 / 3;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    & button {
+      transition: none;
+    }
+  }
+}

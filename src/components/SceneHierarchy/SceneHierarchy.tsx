@@ -170,6 +170,7 @@ export function SceneHierarchy({
           hasBackground={Boolean(scene.background)}
         />
       </div>
+      <div className="hierarchy-content-scroll">
       <div className="hierarchy-scroll">
         <div className="tree" role="tree" aria-label="Scene objects">
           {rows.map((row) => {
@@ -257,7 +258,7 @@ export function SceneHierarchy({
                     <input
                       className="object-rename"
                       ref={renameInput}
-                      aria-label="Rename Java model"
+                      aria-label={row.kind === "avatar" ? "Rename avatar" : "Rename Java model"}
                       defaultValue={row.name}
                       maxLength={100}
                       onBlur={(e) => {
@@ -329,6 +330,7 @@ export function SceneHierarchy({
             );
           })}
         </div>
+      </div>
       </div>
       {menu &&
         (target || menu.id === "empty") &&
@@ -419,7 +421,7 @@ export function SceneHierarchy({
                     Avatar settings
                   </button>
                 )}
-                {target.kind === "model" && (
+                {(target.kind === "model" || target.kind === "avatar") && (
                   <button
                     type="button"
                     role="menuitem"

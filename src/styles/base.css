@@ -11,6 +11,7 @@
   color-scheme: dark;
   --bg-main: #1c1f25;
   --bg-panel: #252a31;
+  --bg-panel-heading: color-mix(in srgb, var(--bg-panel) 88%, black);
   --bg-panel-soft: #2b313a;
   --bg-panel-raised: #303744;
   --bg-toolbar: #20242b;
@@ -100,4 +101,37 @@ button:focus-visible {
   height: 1px;
   opacity: 0;
   pointer-events: none;
+}
+
+/* Shared scrollbars for panels, menus, dialogs and document overflow. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb, #657181) var(--bg-panel-heading);
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: var(--bg-panel-heading); }
+*::-webkit-scrollbar-thumb { background: var(--scroll-thumb, #657181); border: 2px solid var(--bg-panel-heading); border-radius: 6px; }
+*::-webkit-scrollbar-thumb:hover { background: #8794a6; }
+*::-webkit-scrollbar-corner { background: var(--bg-panel-heading); }
+
+@property --scroll-thumb {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #657181;
+}
+[data-scroll-region] {
+  scrollbar-gutter: stable;
+  --scroll-thumb: transparent;
+  transition: --scroll-thumb 180ms ease;
+}
+[data-scroll-region][data-scroll-overflow] { --scroll-thumb: #657181; }
+@media (prefers-reduced-motion: reduce) {
+  [data-scroll-region] { transition: none; }
+}
+
+
+/* Empty native gutters use the element background, not scrollbar-track. */
+[data-scroll-region] {
+  background-image: linear-gradient(to left, var(--bg-panel-heading) 0 var(--scroll-gutter-width, 0px), transparent var(--scroll-gutter-width, 0px));
+  background-origin: padding-box;
 }
